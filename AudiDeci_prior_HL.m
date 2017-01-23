@@ -47,12 +47,12 @@ list{'meta'}{'save_filename'} = save_filename;
 
 %% trial variables
 % generate conditions
-nRep = 48;
+nRep = 24;
 
 taskConditions = topsConditions(cur_task);
 
 prior_parameter = 'priorLevel';
-prior_values = {-3 -2 -1 0 1 2 3};
+prior_values = {-2 0 2};
 taskConditions.addParameter(prior_parameter, prior_values);
 
 likesPriorLevel = topsFoundation();
@@ -78,19 +78,23 @@ list{'control'}{'task conditions'} = taskConditions;
 list{'control'}{'priorLevels'} = priorLevels;
 
 % generate cohLevels for each priorLevel
-coh_list = [0.2 0.35 0.5 0.65 0.8];
+coh_list = [0.2 0.3 0.4 0.5 0.6 0.7 0.8];
 cohLevels = zeros(size(priorLevels));
 for cc = 1:nCond
     ind = find(priorLevels == prior_values{cc});
     tmp_coh = topsConditions('coh');
     switch prior_values{cc}
-        case -3, coh_values = [repmat(coh_list(1),1,6) repmat(coh_list(2),1,6) repmat(coh_list(3),1,4)]; % 12 low + 4 noise
-        case -2, coh_values = [repmat(coh_list(1),1,5) repmat(coh_list(2),1,5) repmat(coh_list(3),1,4) coh_list(4) coh_list(5)]; % 10 low + 4 noise + 2 high
-        case -1, coh_values = [repmat(coh_list(1),1,4) repmat(coh_list(2),1,4) repmat(coh_list(3),1,4) repmat(coh_list(4),1,2) repmat(coh_list(5),1,2)]; % 8 low + 4 noise + 4 high
-        case  0, coh_values = [repmat(coh_list(1),1,3) repmat(coh_list(2),1,3) repmat(coh_list(3),1,4) repmat(coh_list(4),1,3) repmat(coh_list(5),1,3)]; % 6 low + 4 noise + 6 high
-        case  1, coh_values = [repmat(coh_list(1),1,2) repmat(coh_list(2),1,2) repmat(coh_list(3),1,4) repmat(coh_list(4),1,4) repmat(coh_list(5),1,4)]; % symmetric to above
-        case  2, coh_values = [coh_list(1) coh_list(2) repmat(coh_list(3),1,4) repmat(coh_list(4),1,5) repmat(coh_list(5),1,5)];
-        case  3, coh_values = [repmat(coh_list(3),1,4) repmat(coh_list(4),1,6) repmat(coh_list(5),1,6)];
+        case -2, coh_values = [repmat(coh_list(1),1,5) repmat(coh_list(2),1,5) repmat(coh_list(3),1,5) repmat(coh_list(4),1,6) coh_list(5) coh_list(6) coh_list(7)]; % 15 low + 6 noise + 3 high
+        case  0, coh_values = [repmat(coh_list(1),1,3) repmat(coh_list(2),1,3) repmat(coh_list(3),1,3) repmat(coh_list(4),1,6) repmat(coh_list(5),1,3) repmat(coh_list(6),1,3) repmat(coh_list(7),1,3)]; % 9 low + 6 noise + 9 high
+        case  2, coh_values = [coh_list(1) coh_list(2) coh_list(3) repmat(coh_list(4),1,6) repmat(coh_list(5),1,5) repmat(coh_list(6),1,5) repmat(coh_list(7),1,5)]; % 3 low + 6 noise + 15 high
+
+%         case -3, coh_values = [repmat(coh_list(1),1,6) repmat(coh_list(2),1,6) repmat(coh_list(3),1,4)]; % 12 low + 4 noise
+%         case -2, coh_values = [repmat(coh_list(1),1,5) repmat(coh_list(2),1,5) repmat(coh_list(3),1,4) coh_list(4) coh_list(5)]; % 10 low + 4 noise + 2 high
+%         case -1, coh_values = [repmat(coh_list(1),1,4) repmat(coh_list(2),1,4) repmat(coh_list(3),1,4) repmat(coh_list(4),1,2) repmat(coh_list(5),1,2)]; % 8 low + 4 noise + 4 high
+%         case  0, coh_values = [repmat(coh_list(1),1,3) repmat(coh_list(2),1,3) repmat(coh_list(3),1,4) repmat(coh_list(4),1,3) repmat(coh_list(5),1,3)]; % 6 low + 4 noise + 6 high
+%         case  1, coh_values = [repmat(coh_list(1),1,2) repmat(coh_list(2),1,2) repmat(coh_list(3),1,4) repmat(coh_list(4),1,4) repmat(coh_list(5),1,4)]; % symmetric to above
+%         case  2, coh_values = [coh_list(1) coh_list(2) repmat(coh_list(3),1,4) repmat(coh_list(4),1,5) repmat(coh_list(5),1,5)];
+%         case  3, coh_values = [repmat(coh_list(3),1,4) repmat(coh_list(4),1,6) repmat(coh_list(5),1,6)];
     end
     coh_values = num2cell(coh_values);
     tmp_coh.addParameter('cohLevel', coh_values);
@@ -137,8 +141,13 @@ neg_feedback = dotsPlayableFile();
 neg_feedback.fileName = 'beep-02.wav';
 neg_feedback.intensity = 0.5;
 
+end_player = dotsPlayableFile();
+end_player.fileName = 'win.mp3';
+end_player.intensity = 0.5;
+
 list{'Feedback'}{'pos'} = pos_feedback;
 list{'Feedback'}{'neg'} = neg_feedback;
+list{'Feedback'}{'end_fx'} = end_player;
 
 %% time variables
 
@@ -230,30 +239,22 @@ list{'Counter'}{'trial'} = 0;
 list{'Stimulus'}{'header'} = hd;
 list{'Stimulus'}{'player'} = player;
 
-list{'Stimulus'}{'waveforms'} = cell(1,nTrials);
-list{'Stimulus'}{'isH'} = zeros(1,nTrials);
+list{'Stimulus'}{'waveforms'} = cell(nTrials,1);
+list{'Stimulus'}{'freq'} = cell(nTrials,1);
+list{'Stimulus'}{'isH'} = zeros(nTrials,1);
+list{'Stimulus'}{'isH_played'} = zeros(nTrials,1);
+list{'Stimulus'}{'coh_played'} = zeros(nTrials,1);
+list{'Stimulus'}{'numTones_played'} = zeros(nTrials,1);
 
 % TIMESTAMPS]
-list{'Timestamps'}{'stim_start'} = zeros(1,nTrials);
-list{'Timestamps'}{'stim_stop'} = zeros(1,nTrials);
-list{'Timestamps'}{'choices'} = zeros(1,nTrials);
+list{'Timestamps'}{'stim_start'} = zeros(nTrials,1);
+list{'Timestamps'}{'stim_stop'} = zeros(nTrials,1);
+list{'Timestamps'}{'choices'} = zeros(nTrials,1);
 
 % INPUT
-list{'Input'}{'choices'} = zeros(1,nTrials);
-list{'Input'}{'corrects'} = zeros(1,nTrials);
-list{'Input'}{'RT'} = zeros(1,nTrials);
-
-
-%%%%%%%%%%%%%%% not clear yet %%%%%%%%%%%%%%%
-% % SYNCH
-%     daq = labJack();
-%     daqinfo.port = 0;
-%     daqinfo.pulsewidth = 200; %milliseconds
-%     list{'Synch'}{'DAQ'} = daq;
-%     list{'Synch'}{'Info'} = daqinfo;
-%     list{'Synch'}{'Times'} = [];
-%     
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+list{'Input'}{'choices'} = zeros(nTrials,1);
+list{'Input'}{'corrects'} = zeros(nTrials,1);
+list{'Input'}{'RT'} = zeros(nTrials,1);
 
 
 %% Graphics
@@ -273,7 +274,7 @@ readyprompt.typefaceName = 'Calibri';
 readyprompt.isVisible = true;
 
 buttonprompt = dotsDrawableText();
-buttonprompt.string = 'press the space bar to get started';
+buttonprompt.string = 'press A to get started';
 buttonprompt.fontSize = 24;
 buttonprompt.typefaceName = 'Calibri';
 buttonprompt.y = -2;
@@ -314,6 +315,20 @@ cursor.yCenter = 0;
 cursor.isVisible = false;
 list{'Graphics'}{'cursor'} = cursor;
 
+%Text prompts
+readyprompt2 = dotsDrawableText();
+readyprompt2.string = 'Congratulations! Your performance is ';
+readyprompt2.fontSize = 38;
+readyprompt2.typefaceName = 'Calibri';
+readyprompt2.isVisible = false;
+
+buttonprompt2 = dotsDrawableText();
+buttonprompt2.string = 'press A to quit';
+buttonprompt2.fontSize = 24;
+buttonprompt2.typefaceName = 'Calibri';
+buttonprompt2.y = -2;
+buttonprompt2.isVisible = false;
+
 %Graphical ensemble
 ensemble = dotsEnsembleUtilities.makeEnsemble('Fixation Point', false);
 box = ensemble.addObject(preCue_box);
@@ -321,11 +336,16 @@ line = ensemble.addObject(preCue_line);
 target = ensemble.addObject(cursor);
 ready = ensemble.addObject(readyprompt);
 button = ensemble.addObject(buttonprompt);
+ready2 = ensemble.addObject(readyprompt2);
+button2 = ensemble.addObject(buttonprompt2);
 
 list{'Graphics'}{'ensemble'} = ensemble;
 list{'Graphics'}{'box'} = box;
 list{'Graphics'}{'line'} = line;
 list{'Graphics'}{'target'} = target;
+list{'Graphics'}{'ready2'} = ready2;
+list{'Graphics'}{'button2'} = button2;
+
 
 % tell the ensembles how to draw a frame of graphics
 % the static drawFrame() takes a cell array of objects
@@ -375,6 +395,16 @@ mainMachine.addMultipleStates(mainStates);
 
 list{'control'}{'mainMachine'} = mainMachine;
 
+% End machine, for use in post-task
+endMachine = topsStateMachine();
+endStates = {'name', 'entry', 'input', 'exit', 'timeout', 'next';
+    'Ready', {@startEndTask list},      {},      {@waitForCheckKey list},     0,       'Hide';
+    'Hide', {hide [ready2 button2]}, {}, {}, 0, 'Finish';
+    'Finish', {}, {}, {}, 0, '';};
+endMachine.addMultipleStates(endStates);
+
+list{'control'}{'endMachine'} = endMachine;
+
 prepareConcurrents = topsConcurrentComposite();
 prepareConcurrents.addChild(ensemble);
 prepareConcurrents.addChild(prepareMachine);
@@ -394,15 +424,46 @@ mainTree = topsTreeNode();
 mainTree.iterations = nTrials;
 mainTree.addChild(mainConcurrents);
 
+endConcurrents = topsConcurrentComposite();
+endConcurrents.addChild(ensemble);
+endConcurrents.addChild(endMachine);
+endConcurrents.addChild(screen);
+
+% add a branch to the tree trunk to lauch a Fixed Time trial
+endTree = topsTreeNode();
+endTree.addChild(endConcurrents);
+
 % Top Level Runnables
 task = topsTreeNode();
 task.startFevalable = {@callObjectMethod, screen, @open};
 task.finishFevalable = {@callObjectMethod, screen, @close};
 task.addChild(prepareTree);
 task.addChild(mainTree);
+task.addChild(endTree);
 end
 
 %% Accessory Functions
+function startEndTask(list)
+% overall performance
+end_fx = list{'Feedback'}{'end_fx'};
+end_fx.prepareToPlay;
+end_fx.play;
+
+corrects = list{'Input'}{'corrects'};
+perf = 100*sum(corrects)/length(corrects);
+
+% prepare text + performance
+ensemble = list{'Graphics'}{'ensemble'};
+ready2 = list{'Graphics'}{'ready2'};
+button2 = list{'Graphics'}{'button2'};
+tmp_str = ensemble.getObjectProperty('string', ready2);
+tmp_str = [tmp_str num2str(perf) ' %'];
+ensemble.setObjectProperty('string', tmp_str, ready2);
+
+% make them visible
+ensemble.setObjectProperty('isVisible', true, ready2);
+ensemble.setObjectProperty('isVisible', true, button2);
+end
 
 function startTrial(list)
 % clear data from the last trial
@@ -419,7 +480,7 @@ line = list{'Graphics'}{'line'};
 box = list{'Graphics'}{'box'};
 % set level of vertical line to prior level
 yLevel = priorLevels(counter)/2;
-ensemble.setObjectProperty('yFrom', yLevel,line);
+ensemble.setObjectProperty('yFrom', yLevel, line);
 ensemble.setObjectProperty('yTo', yLevel, line);
 ensemble.setObjectProperty('isVisible', true, line);
 ensemble.setObjectProperty('isVisible', true, box);
@@ -431,7 +492,8 @@ target = list{'Graphics'}{'target'};
 box = list{'Graphics'}{'box'};
 ensemble.setObjectProperty('isVisible', false, target);
 ensemble.setObjectProperty('isVisible', false, box);
-% only need to wait our the intertrial interval
+% startsave(list) % too slow
+
 pause(list{'timing'}{'intertrial'});
 end
 
@@ -458,15 +520,23 @@ end
 
 function string = waitForChoiceKey(list)
     % Getting list items
+    counter = list{'Counter'}{'trial'};
     ensemble = list{'Graphics'}{'ensemble'};
     target = list{'Graphics'}{'target'};
-    choices = list{'Input'}{'choices'};
-    counter = list{'Counter'}{'trial'};
     ui = list{'Input'}{'controller'};
     player = list{'Stimulus'}{'player'};
-    isH = list{'Stimulus'}{'isH'}; % whether it's a high-freq trial
+    freq = list{'Stimulus'}{'freq'};
+    hd = list{'Stimulus'}{'header'};
+    stim_start = list{'Timestamps'}{'stim_start'};
     responsewindow = list{'Input'}{'responseWindow'};
-    cur_f = isH(counter) + 1; % isH : 2 - high | 1 - low
+    
+    choices = list{'Input'}{'choices'};
+    
+    isH = list{'Stimulus'}{'isH'}; % whether it's a high-freq trial
+    isH_played = list{'Stimulus'}{'isH_played'};
+    coh_played = list{'Stimulus'}{'coh_played'};
+    numTones_played = list{'Stimulus'}{'numTones_played'};
+    
     ui.flushData
     
   %Initializing variable
@@ -488,14 +558,45 @@ function string = waitForChoiceKey(list)
         [~, ~, eventname, ~] = ui.getHappeningEvent();
         if ~isempty(eventname) && length(eventname) == 1
             press = eventname;
-            player.stop;
+            player.stop;        % once a response is detected, stop the stimulus
+            
+            %Get timestamp - stim_stop time
+            stim_stop = list{'Timestamps'}{'stim_stop'};
+            stim_stop(counter) = player.stopTime;
+            list{'Timestamps'}{'stim_stop'} = stim_stop;
         end
     end
     
-    %Get timestamp
-    stim_stop = list{'Timestamps'}{'stim_stop'};
-    stim_stop(counter) = player.stopTime;
-    list{'Timestamps'}{'stim_stop'} = stim_stop;
+
+    %Get timestamp - button press time
+    if ~isempty(press)
+        timestamp = ui.history;
+        timestamp = timestamp(timestamp(:, 2) > 1, :); %Just to make sure I get a timestamp from a pressed key/button
+        timestamp = timestamp(end);
+        rt = (timestamp - stim_start(counter))*1000; %ms
+        cur_choice = press{1};
+        
+        % get number of tones played before behavioral report
+        numTones_played(counter) = floor(rt/(hd.toneDur+hd.toneSOA));
+        playedTones = freq{counter}(1:numTones_played(counter));
+        isLo = sum(playedTones == hd.loFreq);
+        isHi = sum(playedTones == hd.hiFreq);
+        coh_played(counter) = isHi/numTones_played(counter);
+        isH_played(counter) = isHi > isLo;
+        cur_f = isH_played(counter) + 1; % isH : 2 - high | 1 - low
+    else
+        rt = nan;
+        cur_choice = nan;
+        cur_f = isH(counter) + 1;
+    end
+    
+    timestamps = list{'Timestamps'}{'choices'};
+    timestamps(counter) = timestamp;
+    list{'Timestamps'}{'choices'} = timestamps;
+    
+    list{'Stimulus'}{'isH_played'} = isH_played;
+    list{'Stimulus'}{'coh_played'} = coh_played;
+    list{'Stimulus'}{'numTones_played'} = numTones_played;
     
     %Updating choices list
     if strcmp(press, 'right')
@@ -510,27 +611,10 @@ function string = waitForChoiceKey(list)
         ensemble.setObjectProperty('isVisible', true, target);
     end
     
-    choices(counter+1) = choice;
+    choices(counter) = choice;
     list{'Input'}{'choices'} = choices;
-        
-    %Updating timestamps list
-    if ~isempty(press)
-        timestamp = ui.history;
-        timestamp = timestamp(timestamp(:, 2) > 1, :); %Just to make sure I get a timestamp from a pressed key/button
-        timestamp = timestamp(end);
-        stim_start = list{'Timestamps'}{'stim_start'};
-        rt = (timestamp - stim_start(counter))*1000; %ms
-        cur_choice = press{1};
-    else
-        rt = nan;
-        cur_choice = nan;
-    end
-    
-    timestamps = list{'Timestamps'}{'choices'};
-    timestamps(counter) = timestamp;
-    list{'Timestamps'}{'choices'} = timestamps;
-    
-    
+
+    % check whether the choice was correct
     if cur_f == choice
         correct = 1;
         string = 'Correct';
@@ -582,7 +666,7 @@ function playstim(list)
     
     hd = list{'Stimulus'}{'header'};
     
-    [td,waveform,h] = stimGen_static_HL(hd.loFreq,hd.hiFreq,hd.toneDur,hd.toneSOA,hd.trialDur,cohLevel,hd.fs);
+    [td,waveform,f,h] = stimGen_static_HL(hd.loFreq,hd.hiFreq,hd.toneDur,hd.toneSOA,hd.trialDur,cohLevel,hd.fs);
 
     %importing important list objects
     player = list{'Stimulus'}{'player'};    
@@ -600,21 +684,17 @@ function playstim(list)
     waveforms{counter} = waveform;
     list{'Stimulus'}{'waveforms'} = waveforms;
     
+    freq = list{'Stimulus'}{'freq'};
+    freq{counter} = f;
+    list{'Stimulus'}{'freq'} = freq;
+    
     isH = list{'Stimulus'}{'isH'};
     isH(counter) = h;
     list{'Stimulus'}{'isH'} = isH;
 end
 
-function pulser(list)
-    %import list objects
-    daq = list{'Synch'}{'DAQ'};
-    daqinfo = list{'Synch'}{'Info'};
-    
-    %send pulse
-    time = GetSecs; %getting timestamp. Cmd-response for labjack is <1ms
-    daq.timedTTL(daqinfo.port, daqinfo.pulsewidth);
-    disp('Pulse Sent');
-    
-    %logging timestamp
-    list{'Synch'}{'Times'} = [list{'Synch'}{'Times'}; time];
+function startsave(list)
+    data_folder = '/Research/uPenn_auditoryDecision/data/psychophysics/';
+    save_filename = list{'meta'}{'save_filename'};
+    save([data_folder save_filename '_list.mat'], 'list');
 end

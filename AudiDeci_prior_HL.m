@@ -1,4 +1,4 @@
-function [task, list] = AudiDeci_prior_HL(disp_ind)
+function [task, list] = AudiDeci_prior_HL(disp_ind,nRep)
 
 % 20170114: created by Lalitta - auditory decision task - 
 % 2-alternative forced choice task: low-high frequency discrimination 
@@ -21,7 +21,15 @@ function [task, list] = AudiDeci_prior_HL(disp_ind)
 % gui() method will launch a graphical interface for viewing the objects
 % and data.
 
-%Setting up the screen
+%%
+% if nargin < 1
+%     disp_ind = 0;
+%     isClient = false;
+% elseif nargin < 2
+    isClient = false;
+% end
+
+%% Setting up the screen
 sc = dotsTheScreen.theObject;
 sc.reset('displayIndex', disp_ind); %change display index to 0 for debug (small screen). 1 for full screen. Use >1 for external monitors.
 
@@ -47,7 +55,7 @@ list{'meta'}{'save_filename'} = save_filename;
 
 %% trial variables
 % generate conditions
-nRep = 24;
+% nRep = 24;
 
 taskConditions = topsConditions(cur_task);
 
@@ -84,9 +92,11 @@ for cc = 1:nCond
     ind = find(priorLevels == prior_values{cc});
     tmp_coh = topsConditions('coh');
     switch prior_values{cc}
+        case -3, coh_values = [repmat(coh_list(1),1,6) repmat(coh_list(2),1,6) repmat(coh_list(3),1,6) repmat(coh_list(4),1,6)]; % 18 low + 6 noise
         case -2, coh_values = [repmat(coh_list(1),1,5) repmat(coh_list(2),1,5) repmat(coh_list(3),1,5) repmat(coh_list(4),1,6) coh_list(5) coh_list(6) coh_list(7)]; % 15 low + 6 noise + 3 high
         case  0, coh_values = [repmat(coh_list(1),1,3) repmat(coh_list(2),1,3) repmat(coh_list(3),1,3) repmat(coh_list(4),1,6) repmat(coh_list(5),1,3) repmat(coh_list(6),1,3) repmat(coh_list(7),1,3)]; % 9 low + 6 noise + 9 high
         case  2, coh_values = [coh_list(1) coh_list(2) coh_list(3) repmat(coh_list(4),1,6) repmat(coh_list(5),1,5) repmat(coh_list(6),1,5) repmat(coh_list(7),1,5)]; % 3 low + 6 noise + 15 high
+        case  3, coh_values = [repmat(coh_list(4),1,6) repmat(coh_list(5),1,6) repmat(coh_list(6),1,6) repmat(coh_list(7),1,6)];
 
 %         case -3, coh_values = [repmat(coh_list(1),1,6) repmat(coh_list(2),1,6) repmat(coh_list(3),1,4)]; % 12 low + 4 noise
 %         case -2, coh_values = [repmat(coh_list(1),1,5) repmat(coh_list(2),1,5) repmat(coh_list(3),1,4) coh_list(4) coh_list(5)]; % 10 low + 4 noise + 2 high
@@ -115,8 +125,8 @@ end
 list{'control'}{'cohLevels'} = cohLevels;
 %% audio settings
 
-hd.loFreq = 880; %hz      312.5 |  625 | 1250 | 2500 |  5000
-hd.hiFreq = 3520; %hz     625   | 1250 | 2500 | 5000 | 10000 
+hd.loFreq = 500; %hz      312.5 |  625 | 1250 | 2500 |  5000
+hd.hiFreq = 2000; %hz     625   | 1250 | 2500 | 5000 | 10000 
 hd.toneDur = 50; %ms 25 | 50
 hd.toneSOA = 10; %ms  5 | 10
 hd.trialDur = 2100; %ms
@@ -318,7 +328,7 @@ list{'Graphics'}{'cursor'} = cursor;
 %Text prompts
 readyprompt2 = dotsDrawableText();
 readyprompt2.string = 'Congratulations! Your performance is ';
-readyprompt2.fontSize = 38;
+readyprompt2.fontSize = 30;
 readyprompt2.typefaceName = 'Calibri';
 readyprompt2.isVisible = false;
 
@@ -330,7 +340,7 @@ buttonprompt2.y = -2;
 buttonprompt2.isVisible = false;
 
 %Graphical ensemble
-ensemble = dotsEnsembleUtilities.makeEnsemble('Fixation Point', false);
+ensemble = dotsEnsembleUtilities.makeEnsemble('drawables', isClient);
 box = ensemble.addObject(preCue_box);
 line = ensemble.addObject(preCue_line);
 target = ensemble.addObject(cursor);
@@ -353,7 +363,7 @@ ensemble.automateObjectMethod(...
     'draw', @dotsDrawable.drawFrame, {}, [], true);
 
 % also put dotsTheScreen into its own ensemble
-screen = dotsEnsembleUtilities.makeEnsemble('screen', false);
+screen = dotsEnsembleUtilities.makeEnsemble('screen', isClient);
 screen.addObject(dotsTheScreen.theObject());
 list{'Graphics'}{'screen'} = screen;
 

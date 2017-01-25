@@ -5,7 +5,7 @@ close all;
 topsDataLog.flushAllData();
 
 % input = number of trials (per conditions)
-[task list] = AudiDeci_prior_HL(1);
+[task list] = AudiDeci_prior_HL(2,240); % 24 train | 240 task
 
 % visualize the task's structure
 % tree.gui();
@@ -60,3 +60,6 @@ data_table = table((1:nTrials)',priorLevels,cohLevels,coh_played,numTones_played
 %% Saving
 save([data_folder save_filename '_list.mat'], 'list');
 save([data_folder save_filename '_table.mat'], 'data_table', 'meta_data'); %Secondary, redundant save
+
+clear
+close all;

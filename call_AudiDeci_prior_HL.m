@@ -20,7 +20,7 @@ task.run();
 
 % Post-Processing
 data_folder = '/Research/uPenn_auditoryDecision/data/psychophysics/';
-save_filename = list{'meta'}{'save_filename'};
+save_filename = list{'meta'}{'saveFilename'};
 
 % create data table
 meta_data.subject = list{'meta'}{'subjID'};

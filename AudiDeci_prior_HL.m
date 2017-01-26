@@ -51,7 +51,7 @@ list{'meta'}{'subjID'} = subj_id;
 list{'meta'}{'date'} = cur_date;
 list{'meta'}{'time'} = cur_time;
 list{'meta'}{'task'} = cur_task;
-list{'meta'}{'save_filename'} = save_filename;
+list{'meta'}{'saveFilename'} = save_filename;
 
 %% trial variables
 % generate conditions

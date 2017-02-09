@@ -58,11 +58,15 @@ list{'meta'}{'saveFilename'} = save_filename;
 %% settings for generating sequence of conditions
 
 pick_method = 'shuffledEach';
-block_size = 50;
-block_rep = 5; 
+block_size = 20;
+block_rep = 10; 
+
+% block_size = 20;
+% block_rep = 5; 
 
 % prior setting (arbitrary numbers -> used to set location of pre-cue)
 prior_values = {-2 0 2};
+% prior_values = {-3 -2 0 2 3};
 
 % coherence setting -> depending on prior : high prior -> more high-frequency trials
 coh_list = [0.2 0.3 0.4 0.45 0.5 0.55 0.6 0.7 0.8];
@@ -75,13 +79,13 @@ coh_values = cell(n_prior,1);
 for pp = 1:n_prior
     switch prior_values{pp} 
         % minus: more low-freq trials
-        case -3, coh_setting(pp,:) = [5 5 5 5 5 0 0 0 0]; % 5:0
-        case -2, coh_setting(pp,:) = [4 4 4 4 5 1 1 1 1]; % 4:1
+        case -3, coh_setting(pp,:) = [0 5 5 5 5 0 0 0 0]; % 5:0
+        case -2, coh_setting(pp,:) = [0 4 4 4 5 1 1 1 0]; % 4:1
         case -1, coh_setting(pp,:) = [3 3 3 3 5 2 2 2 2]; % 3:2
-        case  0, coh_setting(pp,:) = [2 2 3 3 5 3 3 2 2]; % 3:3
+        case  0, coh_setting(pp,:) = [0 2 3 3 5 3 3 2 0]; % 3:3
         case  1, coh_setting(pp,:) = [2 2 2 2 5 3 3 3 3]; % 2:3
-        case  2, coh_setting(pp,:) = [1 1 1 1 5 4 4 4 4]; % 1:4
-        case  3, coh_setting(pp,:) = [0 0 0 0 5 5 5 5 5]; % 0:5
+        case  2, coh_setting(pp,:) = [0 1 1 1 5 4 4 4 0]; % 1:4
+        case  3, coh_setting(pp,:) = [0 0 0 0 5 5 5 5 0]; % 0:5
             % plus: more high-freq trials
     end
     tmp_coh = [];

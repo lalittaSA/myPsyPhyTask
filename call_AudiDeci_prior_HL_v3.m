@@ -5,7 +5,7 @@ close all;
 topsDataLog.flushAllData();
 
 % input = number of trials (per conditions)
-[task list] = AudiDeci_prior_HL_v3_train(1);
+[task list] = AudiDeci_prior_HL_v3_train(0);
 % [task list] = AudiDeci_prior_HL_v3(2);
 
 % visualize the task's structure

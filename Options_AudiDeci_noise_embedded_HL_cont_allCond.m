@@ -13,7 +13,7 @@ options.fs = 44100;%384000;
 
 %% pretone settings
 options.nPreTones = 1:9;
-options.preToneFreqs = 'permute'; % select from {'single','combine','permute'};
+options.preToneCombination = 'permute'; % select from {'single','combine','permute'};
 
 
 %% prior & amplitude settings

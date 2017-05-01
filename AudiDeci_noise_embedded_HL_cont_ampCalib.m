@@ -1,13 +1,14 @@
-function [task, list] = AudiDeci_noise_embedded_HL_cont(dispInd,ampRanges,subjId,optionName,eyeTrackerOn)
+function [task, list] = AudiDeci_noise_embedded_HL_cont_ampCalib(dispInd,subjID)
 
-% 20170419: created by Lalitta - auditory decision task - 
+
+% 20170428: update for 'cont' task + eye link
+% 20170322: created by Lalitta - auditory decision task - 
 % 2-alternative forced choice task: low-high frequency discrimination
-% stimuli consist of series of tones embeded in noise in which 
-% test tones with an amplitude that varies across trials are randomly interspersed
+% stimuli consist of series of tones embeded in noise the last of which is
+% a test tone with an amplitude that varies across trials -> to build a
+% psychometric curve for each subject & find critical amplitude for H/L
 % stimulus-response combinations: high - left | low - right 
 % using gamepade (L/R buttons) or keyboard (F/J keys; if a HID gamepad is not connected)
-
-% eye tracker is also included
 
 % Feedback is given by auditory signal (coin sound - correct, low-pitched beep - incorrect) 
 % as well as color (green - correct | red - incorrect | gray - absence of response) 
@@ -32,8 +33,14 @@ function [task, list] = AudiDeci_noise_embedded_HL_cont(dispInd,ampRanges,subjId
 % elseif nargin < 2
     isClient = false;
 % end
+if nargin < 2
+    subjID = input('Subject ID:','s');
+    eyeTrackerOn = 0;
+else
+    eyeTrackerOn = 1;
+end
 
-% eyeTrackerOn = 1;
+
 
 %% Setting up the screen
 sc = dotsTheScreen.theObject;
@@ -43,67 +50,133 @@ sc.reset('displayIndex', dispInd); %change display index to 0 for debug (small s
 GetSecs;
 
 % get subject id
-disp(['Starting main task: ' subjId]);
+disp(['Run audio calibration for: ' subjID]);
 curDate = datestr(now,'yymmdd');
 curTime = datestr(now,'HHMM');
 curTask = mfilename;
-saveFilename = [subjId '_' curDate '_' curTime '_' curTask '_' optionName];
+saveFilename = [subjID '_' curDate '_' curTime '_' curTask];
 
 %% Setting up a list structure
 list = topsGroupedList(curTask);
 
 % SUBJECT
-list{'meta'}{'subjID'} = subjId;
+list{'meta'}{'subjID'} = subjID;
 list{'meta'}{'date'} = curDate;
 list{'meta'}{'time'} = curTime;
 list{'meta'}{'task'} = curTask;
-list{'meta'}{'optionName'} = optionName;
 list{'meta'}{'saveFilename'} = saveFilename;
-list{'meta'}{'ampRanges'} = ampRanges;
 
+questVersion = 1;
+list{'meta'}{'questVersion'} = questVersion;
+%% settings for generating sequence of conditions
+nTrials = 100;
+pick_method = 'coin-toss';
+sequenceTypes = {'H','L'};
 
-%% call optionName to get settings 
+taskConditions = topsConditions(curTask);
+sequenceParameter = 'sequenceType';
+taskConditions.addParameter(sequenceParameter, sequenceTypes);
 
-optionFunctionName = ['Options_' curTask '_' optionName];
-options = eval(optionFunctionName);
+likesSequence = topsFoundation();
+taskConditions.addAssignment('sequenceType', likesSequence, '.', 'name');
 
-%% generate task conditions
-list = AudiDeci_taskCondition_hazard(list,options);
-nTrials = list{'Counter'}{'nTrials'};
-%% fill audio settings in list
-list{'Stimulus'}{'loFreq'} = options.loFreq;
-list{'Stimulus'}{'hiFreq'} = options.hiFreq;
-list{'Stimulus'}{'toneDur'} = options.toneDur;
-list{'Stimulus'}{'toneIBI'} = options.toneIBI;
-list{'Stimulus'}{'fs'} = options.fs;
+switch pick_method
+    case 'shuffledEach'
+        taskConditions.setPickingMethod('shuffledEach',nTrials);
+        taskConditions.run();
+        taskConds = cell(nTrials,1);
+        for ii = 1:nTrials
+            taskConds{ii} = sequenceTypes{taskConditions.pickSequence(ii)};
+        end
+    case 'coin-toss'
+        taskConditions.setPickingMethod('coin-toss');
+        taskConditions.maxPicks = nTrials;
+        taskConds = cell(nTrials,1);
+        keepGoing = true;
+        counter = 1;
+        while keepGoing
+            taskConditions.run();
+            taskConds{counter} = likesSequence.name;
+            keepGoing = ~taskConditions.isDone;
+            counter = counter + 1;
+        end
+end
+
+trialVarSequence = taskConds;
+
+list{'Control'}{'trialVarSequence'} = trialVarSequence;
+
+%% audio settings
+
+hd.loFreq = 500; %hz      312.5 |  625 | 1250 | 2500 |  5000
+hd.hiFreq = 2000; %hz     625   | 1250 | 2500 | 5000 | 10000 
+hd.toneDur = 100; %ms 25 | 50
+hd.toneIBI = 300; %ms  5 | 10
+% hd.trialDur = 2100; %ms
+
+hd.fs = 44100;%384000;
+
+%INPUT PARAMETERS
+responsewindow = hd.toneDur/1000 + 3; %Time allowed to respond in, in seconds (== stim duration)
+list{'Input'}{'responseWindow'} = responsewindow;
 
 %Creating audioplayer
 player = dotsPlayableWave();
-player.sampleFrequency = options.fs;
+player.sampleFrequency = hd.fs;
 % player.duration = hd.trialDur/1000; %sec
-player.intensity = 0.2;
+player.intensity = 0.5;
 
 % Feedback 
 pos_feedback = dotsPlayableFile();
 pos_feedback.fileName = 'Coin.wav';
-pos_feedback.intensity = 0.4;
+pos_feedback.intensity = 1;
 neg_feedback = dotsPlayableFile();
 neg_feedback.fileName = 'beep-02.wav';
-neg_feedback.intensity = 0.4;
-
-end_player = dotsPlayableFile();
-end_player.fileName = 'win.mp3';
-end_player.intensity = 0.4;
+neg_feedback.intensity = 1;
 
 list{'Feedback'}{'pos'} = pos_feedback;
 list{'Feedback'}{'neg'} = neg_feedback;
-list{'Feedback'}{'end_fx'} = end_player;
+
+%% QUEST OBJECT
+% Creating Quest structure
+
+if questVersion == 1
+    tGuess = 0.1; %Guess at the appropriate amplitude
+    tGuessSd = 0.5; %Standard deviation in guesses permitted
+    
+    pThreshold = 0.9; %How successful do you want a subject to be?
+    
+    beta = 3.5;
+    delta = 0.1;
+    gamma = 0.5;
+    
+    q = QuestCreate(tGuess, tGuessSd, pThreshold, beta, delta, gamma, 0.005, 0.5); %Quest object created
+    
+    q.normalizePdf=1;
+% initialize quest for high & low amplitude separately  
+    list{'Quest'}{'ObjectH'} = q;
+    list{'Quest'}{'ObjectL'} = q;
+elseif questVersion == 2
+    tGuess = 0; %Guess at the appropriate amplitude
+    tGuessSd = 1; %Standard deviation in guesses permitted
+    
+    pThreshold = 0.7; %How successful do you want a subject to be?
+    
+    beta = 3.5;
+    delta = 0.1;
+    gamma = 0.5;
+    
+    q = QuestCreate(tGuess, tGuessSd, pThreshold, beta, delta, gamma, 0.01, 0.5); %Quest object created
+    
+    q.normalizePdf=1;
+    list{'Quest'}{'Object'} = q;
+end
 
 %% time variables
 
 iti = 1;
-list{'Timing'}{'intertrial'} = iti; %intertrial interval
-list{'Timing'}{'responseWindow'} = options.responsewindow;
+list{'timing'}{'intertrial'} = iti; %intertrial interval
+
 %% Input
 gp = dotsReadableHIDGamepad(); %Set up gamepad object
 
@@ -176,14 +249,13 @@ ui.clockFunction = @GetSecs;
 %Storing ui in a List bin to access from functions!
 ui.isAutoRead = 1;
 
-list{'Input'}{'controller'} = ui;
+list{'Input'}{'Controller'} = ui;
 
 %% EYELINK  
 list{'Eyelink'}{'eyeTrackerOn'} = eyeTrackerOn;
 
 if eyeTrackerOn
-list{'Eyelink'}{'FixAcq'} = 0.1;
-list{'Eyelink'}{'FixHoldTime'} = 0.5;
+list{'Eyelink'}{'Fixtime'} = 0.1;
 list{'Eyelink'}{'SamplingFreq'} = 1000;
 
 screensize = get(0, 'MonitorPositions');
@@ -193,8 +265,8 @@ list{'Eyelink'}{'Centers'} = centers;
 list{'Eyelink'}{'Invalid'} = -32768;
 
 %Setting windows for fixation:
-window_width = 0.5*screensize(1);
-window_height = 0.5*screensize(2);
+window_width = 0.5 * screensize(1);%0.3*screensize(1);
+window_height = 0.5 * screensize(2);%0.3*screensize(2);
 
 xbounds = [centers(1) - window_width/2, centers(1) + window_width/2];
 ybounds = [centers(2) - window_height/2, centers(2) + window_height/2];
@@ -214,14 +286,17 @@ end
 %% add to the list
 
 % COUNTER
+list{'Counter'}{'nTrials'} = nTrials;
 list{'Counter'}{'trial'} = 0;
 
 % STIMULUS
+list{'Stimulus'}{'header'} = hd;
 list{'Stimulus'}{'player'} = player;
 
 list{'Stimulus'}{'waveforms'} = cell(nTrials,1);
 list{'Stimulus'}{'freq'} = cell(nTrials,1);
 list{'Stimulus'}{'isH'} = zeros(nTrials,1);
+list{'Stimulus'}{'testAmps'} = zeros(nTrials,1);
 
 % TIMESTAMPS]
 list{'Timestamps'}{'trialStarts'} = zeros(nTrials,1);
@@ -229,13 +304,11 @@ list{'Timestamps'}{'trialStops'} = zeros(nTrials,1);
 list{'Timestamps'}{'stimStarts'} = zeros(nTrials,1);
 list{'Timestamps'}{'stimStops'} = zeros(nTrials,1);
 list{'Timestamps'}{'choices'} = zeros(nTrials,1);
-list{'Timestamps'}{'rtOffset'} = zeros(nTrials,1);
 
 % INPUT
 list{'Input'}{'choices'} = zeros(nTrials,1);
 list{'Input'}{'corrects'} = zeros(nTrials,1);
 list{'Input'}{'RT'} = zeros(nTrials,1);
-
 
 %% Graphics
 
@@ -248,13 +321,13 @@ list{'Graphics'}{'green'} = [.25 0.75 0.1];
 
 %Text prompts
 readyprompt = dotsDrawableText();
-readyprompt.string = 'Calibration is finished!';
+readyprompt.string = 'Ready?';
 readyprompt.fontSize = 42;
 readyprompt.typefaceName = 'Calibri';
 readyprompt.isVisible = true;
 
 buttonprompt = dotsDrawableText();
-buttonprompt.string = 'press A to start the main task';
+buttonprompt.string = 'press A to get started';
 buttonprompt.fontSize = 24;
 buttonprompt.typefaceName = 'Calibri';
 buttonprompt.y = -2;
@@ -262,29 +335,28 @@ buttonprompt.isVisible = true;
 
 % pre_cue object - a long vertical box with a horizontal line - line level indicates prior
 preCue_box = dotsDrawableTargets();
+% a regtangle
 preCue_box.xCenter = 0;
 preCue_box.yCenter = 0;
 preCue_box.nSides = 4;
+% fill in variables
 preCue_box.colors = list{'Graphics'}{'gray'};
 preCue_box.height = list{'Graphics'}{'preCue height'};
 preCue_box.width = list{'Graphics'}{'preCue width'};
 preCue_box.isVisible = false;
+list{'Graphics'}{'preCue_box'} = preCue_box;
 
 preCue_line = dotsDrawableLines();
 % a horizontal line - length > box width
 preCue_line.pixelSize = 3;
-preCue_line.xFrom = preCue_box.xCenter-(preCue_box.width*3/4);
-preCue_line.xTo = preCue_box.xCenter+(preCue_box.width*3/4);
+preCue_line.xFrom = -preCue_box.width;
+preCue_line.xTo = preCue_box.width;
+preCue_line.colors = list{'Graphics'}{'white'};
 % line level from prior - default value = 0
 preCue_line.yFrom = 0;
 preCue_line.yTo = 0;
 preCue_line.isVisible = false;
-preCue_line.colors = list{'Graphics'}{'white'};
-
-
-list{'Graphics'}{'preCue_box'} = preCue_box;
 list{'Graphics'}{'preCue_line'} = preCue_line;
-
 
 % a cursor dot to indicate user selection
 cursor = dotsDrawableTargets();
@@ -296,20 +368,6 @@ cursor.yCenter = 0;
 cursor.isVisible = false;
 list{'Graphics'}{'cursor'} = cursor;
 
-%Text prompts
-readyprompt2 = dotsDrawableText();
-readyprompt2.string = 'Congratulations! Your performance is ';
-readyprompt2.fontSize = 30;
-readyprompt2.typefaceName = 'Calibri';
-readyprompt2.isVisible = false;
-
-buttonprompt2 = dotsDrawableText();
-buttonprompt2.string = 'press A to quit';
-buttonprompt2.fontSize = 24;
-buttonprompt2.typefaceName = 'Calibri';
-buttonprompt2.y = -2;
-buttonprompt2.isVisible = false;
-
 %Graphical ensemble
 ensemble = dotsEnsembleUtilities.makeEnsemble('drawables', isClient);
 box = ensemble.addObject(preCue_box);
@@ -317,15 +375,12 @@ line = ensemble.addObject(preCue_line);
 target = ensemble.addObject(cursor);
 ready = ensemble.addObject(readyprompt);
 button = ensemble.addObject(buttonprompt);
-ready2 = ensemble.addObject(readyprompt2);
-button2 = ensemble.addObject(buttonprompt2);
+
 
 list{'Graphics'}{'ensemble'} = ensemble;
 list{'Graphics'}{'box'} = box;
 list{'Graphics'}{'line'} = line;
 list{'Graphics'}{'target'} = target;
-list{'Graphics'}{'ready2'} = ready2;
-list{'Graphics'}{'button2'} = button2;
 
 
 % tell the ensembles how to draw a frame of graphics
@@ -348,7 +403,7 @@ screen.automateObjectMethod('flip', @nextFrame);
 %   addCall() accepts fevalables to be called repeatedly during a trial
 trialCalls = topsCallList();
 trialCalls.addCall({@read, ui}, 'read input');
-list{'control'}{'trial calls'} = trialCalls;
+list{'Control'}{'trial calls'} = trialCalls;
 
 %% STATE MACHINE
 show = @(index) ensemble.setObjectProperty('isVisible', true, index); %show asset
@@ -363,72 +418,51 @@ prepStates = {'name', 'entry', 'input', 'exit', 'timeout', 'next';
     'Finish', {}, {}, {}, 0, '';};
 prepareMachine.addMultipleStates(prepStates);
 
-list{'control'}{'prepareMachine'} = prepareMachine;
+list{'Control'}{'prepareMachine'} = prepareMachine;
 
-% State Machine, for use in maintask
-mainMachine = topsStateMachine();
-mainStates = {'name', 'entry', 'input', 'exit', 'timeout', 'next';
+% State Machine, for use in calibTask
+calibMachine = topsStateMachine();
+calibStates = {'name', 'entry', 'input', 'exit', 'timeout', 'next';
                  'CheckReady', {@startTrial list}, {}, {@waitForCheckKey list}, 0, 'Stimulus';
-                 'Stimulus', {@playstim list}, {}, {}, 0, 'Choice';
-                 'Choice', {@setGoTime list}, {}, {@waitForChoiceKey list}, 0, 'Feedback';
+                 'Stimulus', {@playstim list}, {}, {@waitForChoiceKey list}, 0, 'Feedback';
                  'Feedback', {@showFeedback list}, {}, {}, 0, 'Exit';
-                 'Exit',{@finishTrial list}, {}, {}, iti,''};
-mainMachine.addMultipleStates(mainStates);
+                 'Exit',{@finishTrial list}, {}, {}, 0,''};
+calibMachine.addMultipleStates(calibStates);
 
-list{'control'}{'mainMachine'} = mainMachine;
+list{'Control'}{'calibMachine'} = calibMachine;
 
-% End machine, for use in post-task
-endMachine = topsStateMachine();
-endStates = {'name', 'entry', 'input', 'exit', 'timeout', 'next';
-    'Ready', {@startEndTask list},      {},      {@waitForCheckKey list},     0,       'Hide';
-    'Hide', {hide [ready2 button2]}, {}, {}, 0, 'Finish';
-    'Finish', {}, {}, {}, 0, '';};
-endMachine.addMultipleStates(endStates);
-
-list{'control'}{'endMachine'} = endMachine;
 
 prepareConcurrents = topsConcurrentComposite();
 prepareConcurrents.addChild(ensemble);
 prepareConcurrents.addChild(prepareMachine);
 prepareConcurrents.addChild(screen);
 
-% add a branch to the tree trunk to lauch a Fixed Time trial
 prepareTree = topsTreeNode();
 prepareTree.addChild(prepareConcurrents);
 
-mainConcurrents = topsConcurrentComposite();
-mainConcurrents.addChild(ensemble);
-mainConcurrents.addChild(trialCalls);
-mainConcurrents.addChild(mainMachine);
-mainConcurrents.addChild(screen);
+calibConcurrents = topsConcurrentComposite();
+calibConcurrents.addChild(ensemble);
+calibConcurrents.addChild(calibMachine);
+calibConcurrents.addChild(screen);
 
-mainTree = topsTreeNode();
-mainTree.iterations = nTrials;
-mainTree.addChild(mainConcurrents);
-
-endConcurrents = topsConcurrentComposite();
-endConcurrents.addChild(ensemble);
-endConcurrents.addChild(endMachine);
-endConcurrents.addChild(screen);
-
-% add a branch to the tree trunk to lauch a Fixed Time trial
-endTree = topsTreeNode();
-endTree.addChild(endConcurrents);
+calibTree = topsTreeNode();
+calibTree.addChild(calibConcurrents);
+calibTree.iterations = nTrials;
+list{'Control'}{'calibTree'} = calibTree;
 
 % Top Level Runnables
 task = topsTreeNode();
 task.startFevalable = {@callObjectMethod, screen, @open};
 task.finishFevalable = {@callObjectMethod, screen, @close};
 task.addChild(prepareTree);
-task.addChild(mainTree);
-task.addChild(endTree);
+task.addChild(calibTree);
 end
 
 %% Accessory Functions
 
 function startTrial(list)
 % clear data from the last trial
-ui = list{'Input'}{'controller'};
+ui = list{'Input'}{'Controller'};
 ui.flushData();
 
 counter = list{'Counter'}{'trial'};
@@ -438,8 +472,8 @@ list{'Counter'}{'trial'} = counter;
 trialStarts = list{'Timestamps'}{'trialStarts'};
 trialStarts(counter) = mglGetSecs;
 list{'Timestamps'}{'trialStarts'} = trialStarts;
-
-if list{'Eyelink'}{'eyeTrackerOn'}
+eyeTrackerOn = list{'Eyelink'}{'eyeTrackerOn'};
+if eyeTrackerOn
     Eyelink('Message', ['trialStart_' num2str(counter) '_' num2str(mglGetSecs)]);
     trialStartTimestamps = list{'Eyelink'}{'trialStartTimestamps'};
     newsample = Eyelink('NewestFloatSample');
@@ -447,25 +481,18 @@ if list{'Eyelink'}{'eyeTrackerOn'}
     list{'Eyelink'}{'trialStartTimestamps'} = trialStartTimestamps;
 end
 
-trialVarPrior = list{'Control'}{'trialVarPrior'};
 ensemble = list{'Graphics'}{'ensemble'};
 line = list{'Graphics'}{'line'};
 box = list{'Graphics'}{'box'};
 
-% set level of vertical line to prior level
-yLevel = trialVarPrior(counter);
-ensemble.setObjectProperty('yFrom', yLevel, line);
-ensemble.setObjectProperty('yTo', yLevel, line);
-
 ensemble.setObjectProperty('isVisible', true, box);
 ensemble.setObjectProperty('isVisible', false, line);
 ensemble.setObjectProperty('colors', list{'Graphics'}{'white'}, line);
-
 end
 
 function waitForCheckKey(list)
 % Getting list items
-ui = list{'Input'}{'controller'};
+ui = list{'Input'}{'Controller'};
 ui.flushData;
 
 %Initializing variable
@@ -491,7 +518,7 @@ ensemble.setObjectProperty('isVisible', true, line);
 end
 
 function checkFixation(list)
-fixtime = list{'Eyelink'}{'FixAcq'};
+fixtime = list{'Eyelink'}{'Fixtime'};
 fs = list{'Eyelink'}{'SamplingFreq'};
 invalid = list{'Eyelink'}{'Invalid'};
 xbounds = list{'Eyelink'}{'XBounds'};
@@ -517,6 +544,7 @@ while FixVal == 0
         eyestruct = eyestruct(end - lastBin2Shift + 1:end);
         eyestruct(lastBin2Shift:end) = repmat(eyestruct(end),eyeStructSize - lastBin2Shift,1);
         fcounter = lastBin2Shift + 1;
+        disp('SHIFTBIN') % just for testing -  to see how often it is
     else
         fcounter = fcounter + 1;
     end
@@ -573,112 +601,35 @@ while FixVal == 0
         end
     end
 end
-list{'Eyelink'}{'counter'} = fcounter;
-end
-
-function checkFixationHold(list)
-%Import values
-fs = list{'Eyelink'}{'SamplingFreq'};
-fixtime = list{'Eyelink'}{'FixHoldTime'};
-invalid = list{'Eyelink'}{'Invalid'};
-xbounds = list{'Eyelink'}{'XBounds'};
-ybounds = list{'Eyelink'}{'YBounds'};
-
-counter = list{'Eyelink'}{'counter'};
-eyestruct = list{'Eyelink'}{'EyeStruct'};
-
-%Initializing the structure that temporarily holds eyelink sample data
-%Ensuring eyestruct does not get prohibitively large.
-%After 30 seconds it will shift the last second to the first and continue.
-eyeStructSize = size(eyestruct,1);
-fixms = fixtime*fs; %Getting number of fixated milliseconds needed
-
-if counter > eyeStructSize
-    lastBin2Shift = 1000;
-    eyestruct = eyestruct(end - lastBin2Shift + 1:end);
-    eyestruct(lastBin2Shift:end) = repmat(eyestruct(end),eyeStructSize - lastBin2Shift,1);
-    counter = lastBin2Shift + 1;
-else
-    counter = counter + 1;
-end
-
-newsample = Eyelink('NewestFloatSample');
-if newsample.time ~= eyestruct(counter-1).time %Making sure we don't get redundant samples
-    eyestruct(counter) = newsample;
-end
-
-whicheye = ~(eyestruct(counter).gx == invalid); %logical index of correct eye
-
-if sum(whicheye) < 1
-    whicheye = 1:2 < 2; %Defaults to collecting from left eye if both have bad data
-end
-
-xcell = {eyestruct(1:counter).gx};
-ycell = {eyestruct(1:counter).gy};
-xgaze = cellfun(@(x) x(whicheye), xcell);
-ygaze = cellfun(@(x) x(whicheye), ycell);
-
-time = [eyestruct(1:counter).time];
-
-%cleaning up signal to let us tolerate blinks
-if any(xgaze > 0) && any(ygaze > 0)
-    xgaze(xgaze < 0) = [];
-    ygaze(ygaze < 0) = [];
-    time(xgaze < 0) = []; %Applying same deletion to time vector
-end
-
-%Program cannot collect data as fast as Eyelink provides, so it's
-%necessary to check times for samples to get a good approximation
-%for how long a subject is fixating
-endtime = time(end);
-start_idx = find((time <= endtime - fixms), 1, 'last');
-
-if ~isempty(start_idx)
-    lengthreq = length(start_idx:length(xgaze));
-else
-    lengthreq = Inf;
-end
-
-if length(xgaze) >= lengthreq
-    if all(xgaze(start_idx:end)  >= xbounds(1) & ...
-            xgaze(start_idx:end) <= xbounds(2)) && ...
-            all(ygaze(start_idx:end) >= ybounds(1) & ...
-            ygaze(start_idx:end) <= ybounds(2))
-        
-        list{'Eyelink'}{'FixVal'} = 1;
-        list{'Eyelink'}{'EyeStruct'} = eyestruct;
-    else
-        list{'Eyelink'}{'FixVal'} = 0;
-        list{'Eyelink'}{'EyeStruct'} = eyestruct;
-        ensemble = list{'Graphics'}{'ensemble'};
-        line = list{'Graphics'}{'line'};
-        ensemble.setObjectProperty('isVisible', false, line);
-    end
-end
 end
 
 function playstim(list)
+
+%Adding current iteration to counter
 counter = list{'Counter'}{'trial'};
-rtOffset = list{'Timestamps'}{'rtOffset'};
+questVersion = list{'meta'}{'questVersion'};
 
-trialVarSNR = list{'Control'}{'trialVarSNR'};
-trialVarStimSeq = list{'Control'}{'trialVarStimSeq'};
+trialVarSequence = list{'Control'}{'trialVarSequence'};
+freqType = trialVarSequence{counter};
 
-loFreq = list{'Stimulus'}{'loFreq'};
-hiFreq = list{'Stimulus'}{'hiFreq'};
-toneDur = list{'Stimulus'}{'toneDur'};
-toneIBI = list{'Stimulus'}{'toneIBI'};
-fs = list{'Stimulus'}{'fs'};
-toneAmpH = max(trialVarSNR);
-toneAmpL = abs(min(trialVarSNR));
-lastToneAmp = abs(trialVarSNR(counter));
-freqType = trialVarStimSeq{counter};
-tic
-[~,waveform,f,h] = stimGen_noise_embedded_HL(loFreq,hiFreq,freqType,toneDur,toneIBI,toneAmpL,toneAmpH,lastToneAmp,fs);
-toc
-stimLength = length(trialVarStimSeq{counter});
-rtOffset(counter) = ((stimLength-1) * toneDur) + ((stimLength-2) * toneIBI);
-list{'Timestamps'}{'rtOffset'} = rtOffset;
+if questVersion == 1
+    switch freqType
+        case 'H'
+            q = list{'Quest'}{'ObjectH'};
+        case 'L'
+            q = list{'Quest'}{'ObjectL'};
+    end
+elseif questVersion == 2
+    q = list{'Quest'}{'Object'};
+end
+
+ampTest = QuestQuantile(q);
+ampTest = abs(ampTest);
+hd = list{'Stimulus'}{'header'};
+
+lastToneAmp = ampTest;
+
+[~,waveform,f,h] = stimGen_noise_embedded_HL(hd.loFreq,hd.hiFreq,freqType,hd.toneDur,hd.toneIBI,0,0,lastToneAmp,hd.fs);
 
 %importing important list objects
 player = list{'Stimulus'}{'player'};
@@ -687,12 +638,17 @@ player.prepareToPlay;
 
 preStimOnTime = mglGetSecs;
 
-if list{'Eyelink'}{'eyeTrackerOn'}
-    Eyelink('Message', ['stimOn_' num2str(counter) '_' num2str(mglGetSecs)]); %Send timestamp to Eyelink before playing
+eyeTrackerOn = list{'Eyelink'}{'eyeTrackerOn'};
+if eyeTrackerOn
     newsample = Eyelink('NewestFloatSample');
+    Eyelink('Message', ['stimOn_' num2str(counter) '_' num2str(mglGetSecs)]); %Send timestamp to Eyelink before playing
 end
 player.play
 postStimOnTime = mglGetSecs;
+
+testAmps = list{'Stimulus'}{'testAmps'};
+testAmps(counter) = ampTest;
+list{'Stimulus'}{'testAmps'} = testAmps;
 
 %Logging timestamps of the stimulus
 stimStarts = list{'Timestamps'}{'stimStarts'};
@@ -711,7 +667,8 @@ isH = list{'Stimulus'}{'isH'};
 isH(counter) = h;
 list{'Stimulus'}{'isH'} = isH;
 
-if list{'Eyelink'}{'eyeTrackerOn'}
+eyeTrackerOn = list{'Eyelink'}{'eyeTrackerOn'};
+if eyeTrackerOn
     stimOnTimes = list{'Eyelink'}{'stimOnTimestamps'};
     stimOnTimes(counter) = newsample.time;
     list{'Eyelink'}{'stimOnTimestamps'} = stimOnTimes;
@@ -720,89 +677,47 @@ if list{'Eyelink'}{'eyeTrackerOn'}
     preStimOnTimes(counter)= preStimOnTime;
     list{'Eyelink'}{'preStimOnTimestamps'} = preStimOnTimes;
     
-    postStimOnTimes = list{'Eyelink'}{'postSampleTimestamps'};
+    postStimOnTimes = list{'Eyelink'}{'postStimOnTimestamps'};
     postStimOnTimes(counter)= postStimOnTime;
-    list{'Eyelink'}{'preStimOnTimestamps'} = postStimOnTimes;
-    
-    checkFixationHold(list)
-    if ~list{'Eyelink'}{'FixVal'}
-        fixBreaks = list{'Eyelink'}{'FixBreaks'};
-        fixBreaks(counter) = 1;
-        list{'Eyelink'}{'FixBreaks'} = fixBreaks;
-    end
+    list{'Eyelink'}{'postStimOnTimestamps'} = postStimOnTimes;
 end
-end
-
-function setGoTime(list)
-rtOffset = list{'Timestamps'}{'rtOffset'};
-counter = list{'Counter'}{'trial'};
-goTime = rtOffset(counter)/1000;
-stimStarts = list{'Timestamps'}{'stimStarts'};
-stimStart = stimStarts(counter);
-curTime = mglGetSecs;
-timeLapse = curTime - stimStart;
-while timeLapse < goTime
-    curTime = mglGetSecs;
-    timeLapse = curTime - stimStart;
-    if list{'Eyelink'}{'eyeTrackerOn'}
-        checkFixationHold(list)
-        if ~list{'Eyelink'}{'FixVal'}
-            fixBreaks = list{'Eyelink'}{'FixBreaks'};
-            fixBreaks(counter) = 1;
-            list{'Eyelink'}{'FixBreaks'} = fixBreaks;
-        end
-    end
-    ensemble = list{'Graphics'}{'ensemble'};
-    line = list{'Graphics'}{'line'};
-    ensemble.setObjectProperty('colors', list{'Graphics'}{'gray'}, line);
-end
-
 end
 
 function string = waitForChoiceKey(list)
 % Getting list items
-ui              = list{'Input'}{'controller'};
-counter         = list{'Counter'}{'trial'};
-isH             = list{'Stimulus'}{'isH'}; % whether it's a high-freq trial
-choices         = list{'Input'}{'choices'};
-player          = list{'Stimulus'}{'player'};
-target          = list{'Graphics'}{'target'};
-ensemble        = list{'Graphics'}{'ensemble'};
-rtOffset        = list{'Timestamps'}{'rtOffset'};
-stimStarts      = list{'Timestamps'}{'stimStarts'};
-responsewindow  = list{'Timing'}{'responseWindow'};
+counter = list{'Counter'}{'trial'};
+ensemble = list{'Graphics'}{'ensemble'};
+target = list{'Graphics'}{'target'};
+ui = list{'Input'}{'Controller'};
+player = list{'Stimulus'}{'player'};
+stimStarts = list{'Timestamps'}{'stimStarts'};
+responsewindow = list{'Input'}{'responseWindow'};
 
-if list{'Eyelink'}{'eyeTrackerOn'}
-    fixBreaks   = list{'Eyelink'}{'FixBreaks'};
-end
+testAmps = list{'Stimulus'}{'testAmps'};
+questVersion = list{'meta'}{'questVersion'};
+
+isH = list{'Stimulus'}{'isH'}; % whether it's a high-freq trial
+cur_f = isH(counter) + 1; % isH : 2 - high | 1 - low
+
+timestamps = list{'Timestamps'}{'choices'};
+choices = list{'Input'}{'choices'};
+corrects = list{'Input'}{'corrects'};
+RTs = list{'Input'}{'RT'};
+eyeTrackerOn = list{'Eyelink'}{'eyeTrackerOn'};
+
+ui.flushData
 
 %Initializing variable
-ui.flushData
-press       = '';
-rt          = NaN;
-choice      = NaN;
-cur_choice  = NaN;
-timestamp   = NaN;
+press = '';
+rt = NaN;
+choice = NaN;
+cur_choice = NaN;
+timestamp = NaN;
 
 %Waiting for keypress
+
 tic
 while isempty(press)
-    if list{'Eyelink'}{'eyeTrackerOn'}
-        checkFixationHold(list)
-        if ~list{'Eyelink'}{'FixVal'} || fixBreaks(counter)
-
-            player.stop;
-            
-            Eyelink('Message', ['stimOff_' num2str(counter) '_' num2str(mglGetSecs)]);
-            stimStops = list{'Timestamps'}{'stimStops'};
-            stimStops(counter) = player.stopTime;
-            list{'Timestamps'}{'stimStops'} = stimStops;
-            
-            fixBreaks(counter) = 1;
-            list{'Eyelink'}{'FixBreaks'} = fixBreaks;
-            break
-        end
-    end
     %Break loop if responsewindow expires and move to next trial
     if toc > responsewindow %This was previously Playsecs
         break
@@ -816,8 +731,8 @@ while isempty(press)
         press = eventname;
         player.stop;        % once a response is detected, stop the stimulus
         
-        if list{'Eyelink'}{'eyeTrackerOn'}
-        Eyelink('Message', ['stimOff_' num2str(counter) '_' num2str(mglGetSecs)]);
+        
+        if eyeTrackerOn
         newsample = Eyelink('NewestFloatSample');
         Eyelink('Message', ['response_' num2str(counter) '_' num2str(mglGetSecs)]); %Send timestamp to Eyelink once a response is reported
 
@@ -832,7 +747,7 @@ while isempty(press)
         postResponseTimestamps(counter) = postResponseTimestamp;
         list{'Eyelink'}{'postResponseTimestamps'} = postResponseTimestamps;
         end
-        
+        %Get timestamp - stim_stop time
         stimStops = list{'Timestamps'}{'stimStops'};
         stimStops(counter) = player.stopTime;
         list{'Timestamps'}{'stimStops'} = stimStops;
@@ -844,35 +759,28 @@ if ~isempty(press)
     timestamp = ui.history;
     timestamp = timestamp(timestamp(:, 2) > 1, :); %Just to make sure I get a timestamp from a pressed key/button
     timestamp = timestamp(end);
-    rt = ((timestamp - stimStarts(counter))*1000) - rtOffset(counter); %ms
+    rt = (timestamp - stimStarts(counter))*1000; %ms
     cur_choice = press{1};
 end
-cur_f = isH(counter) + 1; % isH : 2 - high | 1 - low
-
-%Updating choices list
-timestamps = list{'Timestamps'}{'choices'};
 timestamps(counter) = timestamp;
-list{'Timestamps'}{'choices'} = timestamps;
+RTs(counter) = rt;
 
+% check whether the choice was correct
 if strcmp(cur_choice, 'right')
     choice = 2;
 elseif strcmp(cur_choice, 'left')
     choice = 1;
 end
 choices(counter) = choice;
-list{'Input'}{'choices'} = choices;
 
-% check whether the choice was correct
-if isempty(press)
-    correct = nan;
-    string = 'Incorrect';
-elseif cur_f == choice
+if cur_f == choice
     correct = 1;
     string = 'Correct';
 else
     correct = 0;
     string = 'Incorrect';
 end
+corrects(counter) = correct;
 
 if isH(counter)
     ensemble.setObjectProperty('yCenter', 5, target);
@@ -881,17 +789,44 @@ else
 end
 ensemble.setObjectProperty('isVisible', true, target);
 
+if questVersion == 1
+    if isH(counter)
+        q = list{'Quest'}{'ObjectH'};
+        q = QuestUpdate(q, testAmps(counter), correct);
+        list{'Quest'}{'ObjectH'} = q;
+    else
+        q = list{'Quest'}{'ObjectL'};
+        q = QuestUpdate(q, testAmps(counter), correct);
+        list{'Quest'}{'ObjectL'} = q;
+    end
+elseif questVersion == 2
+    q = list{'Quest'}{'Object'};
+    if isH(counter)
+        q = QuestUpdate(q, testAmps(counter), choice-1);
+    else
+        q = QuestUpdate(q, -testAmps(counter), choice-1);
+    end
+    list{'Quest'}{'Object'} = q;
+end
 
-corrects = list{'Input'}{'corrects'};
-corrects(counter) = correct;
+list{'Timestamps'}{'choices'} = timestamps;
+list{'Input'}{'choices'} = choices;
 list{'Input'}{'corrects'} = corrects;
-
-RTs = list{'Input'}{'RT'};
-RTs(counter) = rt;
 list{'Input'}{'RT'} = RTs;
 
 fprintf('Trial %d complete. Choice: %s (%s). RT: %3.3f \n', counter, cur_choice, string, rt);
+
+% % print quest - for testing
+% t=QuestMean(q);	
+% sd=QuestSd(q);
+% fprintf('Final threshold estimate (mean+-sd) is %.2f +- %.2f\n',t,sd);
+% t=QuestMode(q);	
+% fprintf('Mode threshold estimate is %4.2f\n',t);
+% fprintf('Quest knew only your guess: %.2f +- %.2f.\n',q.tGuess,q.tGuessSd);
+% 
+% QuestBetaAnalysis(q); % optional
 end
+
 
 function showFeedback(list)
 % hide the fixation point and cursor
@@ -929,48 +864,21 @@ counter = list{'Counter'}{'trial'};
 trialStops = list{'Timestamps'}{'trialStops'};
 trialStops(counter) = mglGetSecs;
 list{'Timestamps'}{'trialStops'} = trialStops;
-
-if list{'Eyelink'}{'eyeTrackerOn'}
-    Eyelink('Message', ['trialStop_' num2str(counter) '_' num2str(mglGetSecs)]);
+eyeTrackerOn = list{'Eyelink'}{'eyeTrackerOn'};
+if eyeTrackerOn
     trialStopTimestamps = list{'Eyelink'}{'trialStopTimestamps'};
     newsample = Eyelink('NewestFloatSample');
+    Eyelink('Message', ['trialStop_' num2str(counter) '_' num2str(mglGetSecs)]);
     trialStopTimestamps(counter) = newsample.time;
     list{'Eyelink'}{'trialStopTimestamps'} = trialStopTimestamps;
 end
-startsave(list)
-pause(list{'Timing'}{'intertrial'});
+
+pause(list{'timing'}{'intertrial'});
 end
 
-function startEndTask(list)
-% overall performance
-ensemble = list{'Graphics'}{'ensemble'};
-line = list{'Graphics'}{'line'};
-box = list{'Graphics'}{'box'};
-ensemble.setObjectProperty('isVisible', false, line);
-ensemble.setObjectProperty('isVisible', false, box);
 
-end_fx = list{'Feedback'}{'end_fx'};
-end_fx.prepareToPlay;
-end_fx.play;
-
-corrects = list{'Input'}{'corrects'};
-perf = 100*sum(corrects)/length(corrects);
-
-% prepare text + performance
-
-ready2 = list{'Graphics'}{'ready2'};
-button2 = list{'Graphics'}{'button2'};
-tmp_str = ensemble.getObjectProperty('string', ready2);
-tmp_str = [tmp_str num2str(perf) ' %'];
-ensemble.setObjectProperty('string', tmp_str, ready2);
-
-% make them visible
-ensemble.setObjectProperty('isVisible', true, ready2);
-ensemble.setObjectProperty('isVisible', true, button2);
-end
-
-function startsave(list)
-    data_folder = '/Research/uPenn_auditoryDecision/data/psychophysics/';
-    saveFilename = list{'meta'}{'saveFilename'};
-    save([data_folder saveFilename '_list.mat'], 'list');
-end
+% function startsave(list)
+%     data_folder = '/Research/uPenn_auditoryDecision/data/psychophysics/';
+%     saveFilename = list{'meta'}{'saveFilename'};
+%     save([data_folder saveFilename '_list.mat'], 'list');
+% end

@@ -3,7 +3,7 @@ function list = AudiDeci_taskCondition_hazard(list,options)
 %% get frequency settings
 freqTypes = options.freqTypes;
 freqNames = options.freqNames;
-
+nRep = options.nRep;
 %% get prior & amplitude settings and generate snr combinations for each prior level
 priorLevels = options.priorLevels;
 snrLevels = options.snrLevels;
@@ -26,12 +26,48 @@ for pp = 1:nPrior
     snrValues{pp} = tmp_snr;
 end
 
-%% generate blocks of prior - random order
-nRep = options.nRep;
-
 blockSize = max(sum(snrSetting,2));
-nBlock = nPrior * nRep;
-nTrials = nPrior * blockSize * nRep;
+%% generate pretone length distribution (100 trials) that minimizes predictable hazard rate (exp decay with cutoff: at 20)
+preToneLengthEdges = [1,3,7,13]; % to split preTone lengths into groups
+nPreToneGroup = length(preToneLengthEdges)-1;
+
+preToneBiasGroup = [-1 0 1]; % wanna have more balanced trials than all H-L
+nPreToneBiasType = length(preToneBiasGroup);
+
+preToneBlockSize = nPreToneGroup*nPreToneBiasType;
+
+x = 1:12; % approximate cutoff (to get the last bin ~1)
+expDecay = exp(-x/5.5); % to get mean pretone lenght ~5
+%     plot(expDecay); % just for testing
+nPreToneDistrib = preToneBlockSize*expDecay/sum(expDecay);
+% check if sum = minPreToneBlockSize
+nPreToneDistrib = nPreToneDistrib(nPreToneDistrib > 0);
+nPreTones = x(1:2:length(nPreToneDistrib))+1;
+nPreToneDistrib = nPreToneDistrib(1:2:length(nPreToneDistrib)); % sample only every other pretone lengths
+sumDistrib = sum(nPreToneDistrib);
+nPreToneDistrib = round(nPreToneDistrib*(preToneBlockSize/sumDistrib));
+
+
+nPreToneDistrib_all = (nPrior * blockSize * nRep) * nPreToneDistrib;
+% group pretone lengths to evenly scatter long pretones in all conditions (as the longer ones are rare)
+preToneLengthList = [];
+preToneLengthType = [];
+for nn = 1:length(nPreTones)
+    preToneLengthList = [preToneLengthList;repmat(nPreTones(nn),nPreToneDistrib_all(nn),1)];
+    preToneLengthType = [preToneLengthType;repmat(nPreTones(nn),nPreToneDistrib(nn),1)];
+end
+
+preToneLengthCounts = histcounts(preToneLengthList,preToneLengthEdges);
+preToneLengthNum = discretize(preToneLengthList,preToneLengthEdges);
+mid_bins = preToneLengthEdges(1:end-1)'+(preToneLengthEdges(2:end)'-preToneLengthEdges(1:end-1)')/2;
+preToneLengthGroups = mid_bins(preToneLengthNum);
+preToneGroupLabel = unique([preToneLengthNum,preToneLengthGroups,preToneLengthList],'rows');
+
+
+%% generate blocks of prior - random order
+
+nBlock = nPrior * nRep * preToneBlockSize;
+nTrials = nPrior * blockSize * nRep * preToneBlockSize;
 pick_method = 'shuffledEach';
 priorConditions = topsConditions();
 priorParameter = 'priorLevel';
@@ -41,7 +77,7 @@ priorConditions.addAssignment('priorLevel', likesPrior, '.', 'name');
 
 switch pick_method
     case 'shuffledEach'
-        priorConditions.setPickingMethod('shuffledEach',nRep);
+        priorConditions.setPickingMethod('shuffledEach',nRep * preToneBlockSize);
         priorConditions.run();
         trialVarPrior = nan(nBlock,1);
         for ii = 1:nBlock
@@ -63,42 +99,6 @@ end
 
 trialVarPrior = repmat(trialVarPrior,1,blockSize);
 trialVarPrior = reshape(trialVarPrior',[],1);
-
-%% generate pretone length distribution (100 trials) that minimizes predictable hazard rate (exp decay with cutoff: at 20)
-preToneLengthEdges = [1,3,5,7,13]; % to split preTone lengths into groups
-nPreToneGroup = length(preToneLengthEdges)-1;
-
-preToneBiasGroup = [-1 0 0 1]; % wanna have more balanced trials than all H-L
-nPreToneBiasType = length(preToneBiasGroup);
-
-preToneBlockSize = nPreToneGroup*nPreToneBiasType;
-
-x = 1:12; % approximate cutoff (to get the last bin ~1)
-expDecay = exp(-x/6); % to get mean pretone lenght ~5
-%     plot(expDecay); % just for testing
-nPreToneDistrib = preToneBlockSize*expDecay/sum(expDecay);
-% check if sum = minPreToneBlockSize
-nPreToneDistrib = nPreToneDistrib(nPreToneDistrib > 0);
-nPreTones = x(1:2:length(nPreToneDistrib))+1;
-nPreToneDistrib = nPreToneDistrib(1:2:length(nPreToneDistrib)); % sample only every other pretone lengths
-sumDistrib = sum(nPreToneDistrib);
-nPreToneDistrib = round(nPreToneDistrib*(preToneBlockSize/sumDistrib));
-
-
-nPreToneDistrib_all = (nTrials/(preToneBlockSize*nPreToneBiasType)) * nPreToneDistrib;
-% group pretone lengths to evenly scatter long pretones in all conditions (as the longer ones are rare)
-preToneLengthList = [];
-preToneLengthType = [];
-for nn = 1:length(nPreTones)
-    preToneLengthList = [preToneLengthList;repmat(nPreTones(nn),nPreToneDistrib_all(nn),1)];
-    preToneLengthType = [preToneLengthType;repmat(nPreTones(nn),nPreToneDistrib(nn),1)];
-end
-
-preToneLengthCounts = histcounts(preToneLengthList,preToneLengthEdges);
-preToneLengthNum = discretize(preToneLengthList,preToneLengthEdges);
-mid_bins = preToneLengthEdges(1:end-1)'+(preToneLengthEdges(2:end)'-preToneLengthEdges(1:end-1)')/2;
-preToneLengthGroups = mid_bins(preToneLengthNum);
-preToneGroupLabel = unique([preToneLengthNum,preToneLengthGroups,preToneLengthList],'rows');
 
 %% get pretone settings & generate pretone combinations
 preToneCombination = options.preToneCombination;
@@ -132,18 +132,18 @@ for pp = 1:length(nPreTones)
     preToneBias{pp} = sum(preToneNegPos,2)/nPreTones(pp);  % ratio L(neg)-H(pos) preTones | range = [-1,1];
     preToneBiasAll = [preToneBiasAll;preToneBias{pp}];
     % preTone bias subselection for each length
-    subselect_ind = [ones(nPreToneDistrib_all(pp),1); nComb*ones(nPreToneDistrib_all(pp),1)]; %1 part of all L and all H
+    subselect_ind = [ones(nPreToneDistrib_all(pp),1); nComb*ones(nPreToneDistrib_all(pp),1)]; % all L and all H
     tmp_rand = [];
-    nBalancePreTone = nPreToneDistrib_all(pp)*2;
+    nBalancePreTone = nPreToneDistrib_all(pp);
     noBiasComp = find(preToneBias{pp} == 0);
     if length(noBiasComp) < nBalancePreTone %excluse all H & all L pretones
         while length(tmp_rand) < nBalancePreTone
             tmp_rand = [tmp_rand; noBiasComp(randperm(length(noBiasComp)))];
         end
-        subselect_ind = [subselect_ind; tmp_rand(1:nBalancePreTone)]; % 2 parts of balanced H-L
+        subselect_ind = [subselect_ind; tmp_rand(1:nBalancePreTone)]; % balanced H-L
     else            % if there're more combinations than needed ntrials, pick only ntrials
         tmp_rand = noBiasComp(randperm(length(noBiasComp)));
-        subselect_ind = [subselect_ind; tmp_rand(1:nBalancePreTone)]; % 2 parts of balanced H-L
+        subselect_ind = [subselect_ind; tmp_rand(1:nBalancePreTone)]; % balanced H-L
     end
     
     preToneSelect{pp} = subselect_ind;
@@ -204,10 +204,10 @@ for pp = 1:nPrior
         tmpBiasInd = likesSeqAndSnr.name{2};
         tmpLegnthGroupInd = likesSeqAndSnr.name{3};
         cur_sel = intersect(find(preToneGroupSelect == tmpLegnthGroupInd & preToneBiasSelect == tmpBiasInd),preToneLengthIndList);
-        while isempty(cur_sel)
-            tmpLegnthGroupInd = tmpLegnthGroupInd-1;
-            cur_sel = intersect(find(preToneGroupSelect == tmpLegnthGroupInd & preToneBiasSelect == tmpBiasInd),preToneLengthIndList);
-        end
+%         while isempty(cur_sel)
+%             tmpLegnthGroupInd = tmpLegnthGroupInd-1;
+%             cur_sel = intersect(find(preToneGroupSelect == tmpLegnthGroupInd & preToneBiasSelect == tmpBiasInd),preToneLengthIndList);
+%         end
         tmp_rand = randperm(length(cur_sel));
         cur_sel = cur_sel(tmp_rand(1));
         trialVarPreToneSeq(counter) = preToneSeqSelect(cur_sel(1));

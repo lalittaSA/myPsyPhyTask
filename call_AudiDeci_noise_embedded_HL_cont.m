@@ -4,13 +4,24 @@ close all;
 
 topsDataLog.flushAllData();
 
+%% test gamepad
+
+[task_game list_game] = gamepadTest(0);
+task_game.run();
+
+clear task_game list_game
+
 %% paths & stuffs
 
-data_folder = '/Research/uPenn_auditoryDecision/data/psychophysics/'; 
+data_folder = './data/';
 
-run_calibOnly = 1;
+trainOnly = 0;
+
+run_calibOnly = 0;
 use_previousCalib = 0; % 0 - start new calibration | 1 - run calib & combine all previous calibration | 2 - use existing calibration files
-eyeTrackerOn = 0;
+eyeTrackerOn = 1;
+
+
 %% calib task
 
 % eye calib
@@ -20,7 +31,7 @@ if eyeTrackerOn
     [task_calib list_calib] = AudiDeci_noise_embedded_HL_cont_ampCalib(1,subjID);
 else
     % without eye calib
-    [task_calib list_calib] = AudiDeci_noise_embedded_HL_cont_ampCalib(0);
+    [task_calib list_calib] = AudiDeci_noise_embedded_HL_cont_ampCalib(1);
     subjID = list_calib{'meta'}{'subjID'};
 end
 %% save calib list into table
@@ -64,11 +75,22 @@ end
 
 
 %%  main task
-optionName = 'preToneLength';
+
 if ~run_calibOnly
     [subjAmpRange] = getDiscrimThreshold(calib_folder,questVersion,meta_data_calib.subject);
-    [task_main list_main] = AudiDeci_noise_embedded_HL_cont(0,subjAmpRange,subjID,optionName,eyeTrackerOn);
     
+    if trainOnly
+        subjAmpRange = [0 1;0 1]; 
+        eyeTrackerOn = 0;
+        subjID = 'test';
+        optionName = 'preToneLength';
+        [task_main list_main] = AudiDeci_noise_embedded_HL_cont_train(1,subjAmpRange,subjID,optionName,eyeTrackerOn);
+        
+    else
+        optionName = 'main';
+        [task_main list_main] = AudiDeci_noise_embedded_HL_cont(1,subjAmpRange,subjID,optionName,eyeTrackerOn);
+        
+    end
     task_main.run();
     
     %create data table
@@ -116,7 +138,7 @@ if ~run_calibOnly
     
     data_table_main = table((1:nTrials)',trialVarAmp,trialVarSNR,trialVarPrior,trialVarStimSeq,trialVarPreToneSeq,trialVarPreToneBias,trialVarPreToneLength,trialVarLastConsPretone,isH,...
         success,choices,rt,trialStarts,trialStops,stimStarts,stimStops,choiceTimeStamp,rtOffset,...
-        'VariableNames',{'trialID','stimAmplitude','SNR','stimSequence','pretoneSeq','pretoneBias','pretoneLength','LastConsPretone','isH',...
+        'VariableNames',{'trialID','stimAmplitude','SNR','prior','stimSequence','pretoneSeq','pretoneBias','pretoneLength','LastConsPretone','isH',...
         'success','choice','RT','trialStarts','trialStops','stimStarts','stimStops','choiceTimeStamp','RToffset'});
     
     
@@ -131,7 +153,7 @@ if ~run_calibOnly
         data_table_main = table((1:nTrials)',trialVarAmp,trialVarSNR,trialVarPrior,trialVarStimSeq,trialVarPreToneSeq,trialVarPreToneBias,trialVarPreToneLength,trialVarLastConsPretone,isH,...
             success,choices,rt,trialStarts,trialStops,stimStarts,stimStops,choiceTimeStamp,rtOffset,...
             trialStart_el,preStimOn,stimOn_el,postStimOn,response_el,postResponse,trialStop_el,...
-            'VariableNames',{'trialID','stimAmplitude','SNR','stimSequence','pretoneSeq','pretoneBias','pretoneLength','LastConsPretone','isH',...
+            'VariableNames',{'trialID','stimAmplitude','SNR','prior','stimSequence','pretoneSeq','pretoneBias','pretoneLength','LastConsPretone','isH',...
             'success','choice','RT','trialStarts','trialStops','stimStarts','stimStops','choiceTimeStamp','RToffset',...
             'trialStart_el','preStimOn','stimOn_el','postStimOn','response_el','postResponse','trialStop_el'});
     end

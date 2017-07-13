@@ -81,19 +81,19 @@ list{'Stimulus'}{'fs'} = options.fs;
 player = dotsPlayableWave();
 player.sampleFrequency = options.fs;
 % player.duration = hd.trialDur/1000; %sec
-player.intensity = 0.2;
+player.intensity = 0.1;
 
 % Feedback 
 pos_feedback = dotsPlayableFile();
 pos_feedback.fileName = 'Coin.wav';
-pos_feedback.intensity = 0.4;
+pos_feedback.intensity = 0.2;
 neg_feedback = dotsPlayableFile();
 neg_feedback.fileName = 'beep-02.wav';
-neg_feedback.intensity = 0.4;
+neg_feedback.intensity = 0.2;
 
 end_player = dotsPlayableFile();
 end_player.fileName = 'win.mp3';
-end_player.intensity = 0.4;
+end_player.intensity = 0.2;
 
 list{'Feedback'}{'pos'} = pos_feedback;
 list{'Feedback'}{'neg'} = neg_feedback;
@@ -183,7 +183,7 @@ list{'Eyelink'}{'eyeTrackerOn'} = eyeTrackerOn;
 
 if eyeTrackerOn
 list{'Eyelink'}{'FixAcq'} = 0.1;
-list{'Eyelink'}{'FixHoldTime'} = 0.5;
+list{'Eyelink'}{'FixHoldTime'} = 0.2;
 list{'Eyelink'}{'SamplingFreq'} = 1000;
 
 screensize = get(0, 'MonitorPositions');
@@ -209,6 +209,8 @@ list{'Eyelink'}{'postStimOnTimestamps'} = zeros(nTrials,1);
 list{'Eyelink'}{'responseTimestamps'} = zeros(nTrials,1);
 list{'Eyelink'}{'postResponseTimestamps'} = zeros(nTrials,1);
 list{'Eyelink'}{'trialStopTimestamps'} = zeros(nTrials,1);
+list{'Eyelink'}{'FixBreaks'} = zeros(nTrials,1);
+list{'Eyelink'}{'FixVal'} = 0;
 
 end
 %% add to the list
@@ -240,7 +242,7 @@ list{'Input'}{'RT'} = zeros(nTrials,1);
 %% Graphics
 
 list{'Graphics'}{'preCue width'} = 0.8;
-list{'Graphics'}{'preCue height'} = 5;
+list{'Graphics'}{'preCue height'} = 6;
 list{'Graphics'}{'white'} = [1 1 1];
 list{'Graphics'}{'gray'} = [0.5 0.5 0.5];
 list{'Graphics'}{'red'} = [0.75 0.25 0.1];
@@ -542,10 +544,12 @@ while FixVal == 0
     ygaze = cellfun(@(x) x(whicheye), ycell);
     
     %cleaning up signal to let us tolerate blinks
-    if any(xgaze > 0) && any(ygaze > 0)
-        xgaze(xgaze < 0) = [];
-        ygaze(ygaze < 0) = [];
-        time(xgaze < 0) = []; %Applying same deletion to time vector
+    maybeblink = any(xgaze > 1500) && any(ygaze > 1500);
+    if maybeblink
+        ind_blink = xgaze > 1500 | ygaze > 1500;
+        xgaze(ind_blink) = [];
+        ygaze(ind_blink) = [];
+        time(ind_blink) = []; %Applying same deletion to time vector
     end
     
     %Program cannot collect data as fast as Eyelink provides, so it's
@@ -621,10 +625,12 @@ ygaze = cellfun(@(x) x(whicheye), ycell);
 time = [eyestruct(1:counter).time];
 
 %cleaning up signal to let us tolerate blinks
-if any(xgaze > 0) && any(ygaze > 0)
-    xgaze(xgaze < 0) = [];
-    ygaze(ygaze < 0) = [];
-    time(xgaze < 0) = []; %Applying same deletion to time vector
+maybeblink = any(xgaze > 1500) && any(ygaze > 1500);
+if maybeblink
+    ind_blink = xgaze > 1500 | ygaze > 1500;
+    xgaze(ind_blink) = [];
+    ygaze(ind_blink) = [];
+    time(ind_blink) = []; %Applying same deletion to time vector
 end
 
 %Program cannot collect data as fast as Eyelink provides, so it's
@@ -661,17 +667,18 @@ function playstim(list)
 counter = list{'Counter'}{'trial'};
 rtOffset = list{'Timestamps'}{'rtOffset'};
 
-trialVarSNR = list{'Control'}{'trialVarSNR'};
 trialVarStimSeq = list{'Control'}{'trialVarStimSeq'};
+trialVarAmp = list{'Control'}{'trialVarAmp'};
+ampRanges = list{'meta'}{'ampRanges'};
 
 loFreq = list{'Stimulus'}{'loFreq'};
 hiFreq = list{'Stimulus'}{'hiFreq'};
 toneDur = list{'Stimulus'}{'toneDur'};
 toneIBI = list{'Stimulus'}{'toneIBI'};
 fs = list{'Stimulus'}{'fs'};
-toneAmpH = max(trialVarSNR);
-toneAmpL = abs(min(trialVarSNR));
-lastToneAmp = abs(trialVarSNR(counter));
+toneAmpH = ampRanges(2,2);
+toneAmpL = ampRanges(1,2);
+lastToneAmp = abs(trialVarAmp(counter));
 freqType = trialVarStimSeq{counter};
 tic
 [~,waveform,f,h] = stimGen_noise_embedded_HL(loFreq,hiFreq,freqType,toneDur,toneIBI,toneAmpL,toneAmpH,lastToneAmp,fs);
@@ -720,11 +727,11 @@ if list{'Eyelink'}{'eyeTrackerOn'}
     preStimOnTimes(counter)= preStimOnTime;
     list{'Eyelink'}{'preStimOnTimestamps'} = preStimOnTimes;
     
-    postStimOnTimes = list{'Eyelink'}{'postSampleTimestamps'};
+    postStimOnTimes = list{'Eyelink'}{'postStimOnTimestamps'};
     postStimOnTimes(counter)= postStimOnTime;
-    list{'Eyelink'}{'preStimOnTimestamps'} = postStimOnTimes;
+    list{'Eyelink'}{'postStimOnTimestamps'} = postStimOnTimes;
     
-    checkFixationHold(list)
+%     checkFixationHold(list)
     if ~list{'Eyelink'}{'FixVal'}
         fixBreaks = list{'Eyelink'}{'FixBreaks'};
         fixBreaks(counter) = 1;
@@ -745,7 +752,7 @@ while timeLapse < goTime
     curTime = mglGetSecs;
     timeLapse = curTime - stimStart;
     if list{'Eyelink'}{'eyeTrackerOn'}
-        checkFixationHold(list)
+%         checkFixationHold(list)
         if ~list{'Eyelink'}{'FixVal'}
             fixBreaks = list{'Eyelink'}{'FixBreaks'};
             fixBreaks(counter) = 1;
@@ -788,7 +795,7 @@ timestamp   = NaN;
 tic
 while isempty(press)
     if list{'Eyelink'}{'eyeTrackerOn'}
-        checkFixationHold(list)
+%         checkFixationHold(list)
         if ~list{'Eyelink'}{'FixVal'} || fixBreaks(counter)
 
             player.stop;
@@ -937,7 +944,8 @@ if list{'Eyelink'}{'eyeTrackerOn'}
     trialStopTimestamps(counter) = newsample.time;
     list{'Eyelink'}{'trialStopTimestamps'} = trialStopTimestamps;
 end
-startsave(list)
+
+% startsave(list) % never again! too slow
 pause(list{'Timing'}{'intertrial'});
 end
 
@@ -970,7 +978,7 @@ ensemble.setObjectProperty('isVisible', true, button2);
 end
 
 function startsave(list)
-    data_folder = '/Research/uPenn_auditoryDecision/data/psychophysics/';
+    data_folder = './data/';
     saveFilename = list{'meta'}{'saveFilename'};
     save([data_folder saveFilename '_list.mat'], 'list');
 end

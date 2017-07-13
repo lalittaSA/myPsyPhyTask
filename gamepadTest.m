@@ -126,7 +126,7 @@ rightprompt.isVisible = false;
 
 buttonprompt = dotsDrawableText();
 buttonprompt.string = 'press A to quit';
-buttonprompt.fontSize = 24;
+buttonprompt.fontSize = 42;
 buttonprompt.typefaceName = 'Calibri';
 buttonprompt.isVisible = false;
 

@@ -476,33 +476,6 @@ task.addChild(endTree);
 end
 
 %% Accessory Functions
-function startEndTask(list)
-% overall performance
-ensemble = list{'Graphics'}{'ensemble'};
-line = list{'Graphics'}{'line'};
-box = list{'Graphics'}{'box'};
-ensemble.setObjectProperty('isVisible', false, line);
-ensemble.setObjectProperty('isVisible', false, box);
-
-end_fx = list{'Feedback'}{'end_fx'};
-end_fx.prepareToPlay;
-end_fx.play;
-
-corrects = list{'Input'}{'corrects'};
-perf = 100*sum(corrects)/length(corrects);
-
-% prepare text + performance
-
-ready2 = list{'Graphics'}{'ready2'};
-button2 = list{'Graphics'}{'button2'};
-tmp_str = ensemble.getObjectProperty('string', ready2);
-tmp_str = [tmp_str num2str(perf) ' %'];
-ensemble.setObjectProperty('string', tmp_str, ready2);
-
-% make them visible
-ensemble.setObjectProperty('isVisible', true, ready2);
-ensemble.setObjectProperty('isVisible', true, button2);
-end
 
 function startTrial(list)
 % clear data from the last trial
@@ -525,42 +498,62 @@ ensemble.setObjectProperty('xTo', yLevel, line);
 % ensemble.setObjectProperty('isVisible', true, box);
 end
 
-function finishTrial(list)
-ensemble = list{'Graphics'}{'ensemble'};
-target = list{'Graphics'}{'target'};
-% box = list{'Graphics'}{'box'};
-ensemble.setObjectProperty('isVisible', false, target);
-% ensemble.setObjectProperty('isVisible', false, box);
-% startsave(list) % too slow
-
-pause(list{'timing'}{'intertrial'});
+function waitForCheckKey(list)
+    % Getting list items
+    ui = list{'Input'}{'controller'};
+    ui.flushData;
+    
+    %Initializing variable
+    press = '';
+  
+    %Waiting for keypress
+    while ~strcmp(press, 'continue')
+        press = '';
+        read(ui);
+        [~, ~, eventname, ~] = ui.getHappeningEvent();
+        if ~isempty(eventname) && length(eventname) == 1
+            press = eventname;
+        end
+    end
 end
 
-function showFeedback(list)
-% hide the fixation point and cursor
-ensemble = list{'Graphics'}{'ensemble'};
-target = list{'Graphics'}{'target'};
-counter = list{'Counter'}{'trial'};
+function playstim(list)    
+%     ensemble = list{'Graphics'}{'ensemble'};
+%     line = list{'Graphics'}{'line'};
+%     ensemble.setObjectProperty('isVisible', false, line);
+    
+%Adding current iteration to counter
+    counter = list{'Counter'}{'trial'};
+    coh_list = list{'control'}{'cohLevels'};
+    cohLevel = (coh_list(counter)/200)+0.5;
+    
+    hd = list{'Stimulus'}{'header'};
+    
+    [td,waveform,f,h] = stimGen_static_HL(hd.loFreq,hd.hiFreq,hd.toneDur,hd.toneSOA,hd.trialDur,cohLevel,hd.fs);
 
-% compare stimulus direction to choice direction
-isCorrect = list{'Input'}{'corrects'};
-
-% indicate correct or incorrect by coloring in the targets
-if isnan(isCorrect(counter))
-    ensemble.setObjectProperty('colors', list{'Graphics'}{'gray'}, target);
-    feedback = list{'Feedback'}{'neg'};
-    isCorrect(counter) = 0;
-elseif isCorrect(counter)
-    ensemble.setObjectProperty('colors', list{'Graphics'}{'green'}, target);
-    feedback = list{'Feedback'}{'pos'};
-else
-    ensemble.setObjectProperty('colors', list{'Graphics'}{'red'}, target);
-    feedback = list{'Feedback'}{'neg'};
-end
-feedback.prepareToPlay;
-feedback.play;
-
-list{'Input'}{'corrects'} = isCorrect;
+    %importing important list objects
+    player = list{'Stimulus'}{'player'};    
+    player.wave = waveform;
+    player.prepareToPlay;
+    
+    player.play
+    
+    %Logging timestamps of the stimulus
+    stim_start = list{'Timestamps'}{'stim_start'};
+    stim_start(counter) = player.playTime;
+    list{'Timestamps'}{'stim_start'} = stim_start;
+    
+    waveforms = list{'Stimulus'}{'waveforms'};
+    waveforms{counter} = waveform;
+    list{'Stimulus'}{'waveforms'} = waveforms;
+    
+    freq = list{'Stimulus'}{'freq'};
+    freq{counter} = f;
+    list{'Stimulus'}{'freq'} = freq;
+    
+    isH = list{'Stimulus'}{'isH'};
+    isH(counter) = h;
+    list{'Stimulus'}{'isH'} = isH;
 end
 
 function string = waitForChoiceKey(list)
@@ -686,63 +679,70 @@ function string = waitForChoiceKey(list)
     fprintf('Trial %d complete. Choice: %s (%s). RT: %3.3f \n', counter, cur_choice, string, rt);
 end
 
+function showFeedback(list)
+% hide the fixation point and cursor
+ensemble = list{'Graphics'}{'ensemble'};
+target = list{'Graphics'}{'target'};
+counter = list{'Counter'}{'trial'};
 
-function waitForCheckKey(list)
-    % Getting list items
-    ui = list{'Input'}{'controller'};
-    ui.flushData;
-    
-    %Initializing variable
-    press = '';
-  
-    %Waiting for keypress
-    while ~strcmp(press, 'continue')
-        press = '';
-        read(ui);
-        [~, ~, eventname, ~] = ui.getHappeningEvent();
-        if ~isempty(eventname) && length(eventname) == 1
-            press = eventname;
-        end
-    end
+% compare stimulus direction to choice direction
+isCorrect = list{'Input'}{'corrects'};
+
+% indicate correct or incorrect by coloring in the targets
+if isnan(isCorrect(counter))
+    ensemble.setObjectProperty('colors', list{'Graphics'}{'gray'}, target);
+    feedback = list{'Feedback'}{'neg'};
+    isCorrect(counter) = 0;
+elseif isCorrect(counter)
+    ensemble.setObjectProperty('colors', list{'Graphics'}{'green'}, target);
+    feedback = list{'Feedback'}{'pos'};
+else
+    ensemble.setObjectProperty('colors', list{'Graphics'}{'red'}, target);
+    feedback = list{'Feedback'}{'neg'};
+end
+feedback.prepareToPlay;
+feedback.play;
+
+list{'Input'}{'corrects'} = isCorrect;
 end
 
-function playstim(list)    
-%     ensemble = list{'Graphics'}{'ensemble'};
-%     line = list{'Graphics'}{'line'};
-%     ensemble.setObjectProperty('isVisible', false, line);
-    
-%Adding current iteration to counter
-    counter = list{'Counter'}{'trial'};
-    coh_list = list{'control'}{'cohLevels'};
-    cohLevel = (coh_list(counter)/200)+0.5;
-    
-    hd = list{'Stimulus'}{'header'};
-    
-    [td,waveform,f,h] = stimGen_static_HL(hd.loFreq,hd.hiFreq,hd.toneDur,hd.toneSOA,hd.trialDur,cohLevel,hd.fs);
+function finishTrial(list)
+ensemble = list{'Graphics'}{'ensemble'};
+target = list{'Graphics'}{'target'};
+% box = list{'Graphics'}{'box'};
+ensemble.setObjectProperty('isVisible', false, target);
+% ensemble.setObjectProperty('isVisible', false, box);
+% startsave(list) % too slow
 
-    %importing important list objects
-    player = list{'Stimulus'}{'player'};    
-    player.wave = waveform;
-    player.prepareToPlay;
-    
-    player.play
-    
-    %Logging timestamps of the stimulus
-    stim_start = list{'Timestamps'}{'stim_start'};
-    stim_start(counter) = player.playTime;
-    list{'Timestamps'}{'stim_start'} = stim_start;
-    
-    waveforms = list{'Stimulus'}{'waveforms'};
-    waveforms{counter} = waveform;
-    list{'Stimulus'}{'waveforms'} = waveforms;
-    
-    freq = list{'Stimulus'}{'freq'};
-    freq{counter} = f;
-    list{'Stimulus'}{'freq'} = freq;
-    
-    isH = list{'Stimulus'}{'isH'};
-    isH(counter) = h;
-    list{'Stimulus'}{'isH'} = isH;
+pause(list{'timing'}{'intertrial'});
+end
+
+function startEndTask(list)
+% overall performance
+ensemble = list{'Graphics'}{'ensemble'};
+line = list{'Graphics'}{'line'};
+box = list{'Graphics'}{'box'};
+ensemble.setObjectProperty('isVisible', false, line);
+ensemble.setObjectProperty('isVisible', false, box);
+
+end_fx = list{'Feedback'}{'end_fx'};
+end_fx.prepareToPlay;
+end_fx.play;
+
+corrects = list{'Input'}{'corrects'};
+perf = 100*sum(corrects)/length(corrects);
+
+% prepare text + performance
+
+ready2 = list{'Graphics'}{'ready2'};
+button2 = list{'Graphics'}{'button2'};
+tmp_str = ensemble.getObjectProperty('string', ready2);
+tmp_str = [tmp_str num2str(perf) ' %'];
+ensemble.setObjectProperty('string', tmp_str, ready2);
+
+% make them visible
+ensemble.setObjectProperty('isVisible', true, ready2);
+ensemble.setObjectProperty('isVisible', true, button2);
 end
 
 function startsave(list)

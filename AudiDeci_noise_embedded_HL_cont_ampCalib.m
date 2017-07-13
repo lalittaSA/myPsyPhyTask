@@ -110,8 +110,8 @@ list{'Control'}{'trialVarSequence'} = trialVarSequence;
 
 hd.loFreq = 500; %hz      312.5 |  625 | 1250 | 2500 |  5000
 hd.hiFreq = 2000; %hz     625   | 1250 | 2500 | 5000 | 10000 
-hd.toneDur = 100; %ms 25 | 50
-hd.toneIBI = 300; %ms  5 | 10
+hd.toneDur = 300; %ms 25 | 50
+hd.toneIBI = 100; %ms  5 | 10
 % hd.trialDur = 2100; %ms
 
 hd.fs = 44100;%384000;
@@ -124,15 +124,15 @@ list{'Input'}{'responseWindow'} = responsewindow;
 player = dotsPlayableWave();
 player.sampleFrequency = hd.fs;
 % player.duration = hd.trialDur/1000; %sec
-player.intensity = 0.5;
+player.intensity = 0.1;
 
 % Feedback 
 pos_feedback = dotsPlayableFile();
 pos_feedback.fileName = 'Coin.wav';
-pos_feedback.intensity = 1;
+pos_feedback.intensity = 0.2;
 neg_feedback = dotsPlayableFile();
 neg_feedback.fileName = 'beep-02.wav';
-neg_feedback.intensity = 1;
+neg_feedback.intensity = 0.2;
 
 list{'Feedback'}{'pos'} = pos_feedback;
 list{'Feedback'}{'neg'} = neg_feedback;
@@ -570,10 +570,12 @@ while FixVal == 0
     ygaze = cellfun(@(x) x(whicheye), ycell);
     
     %cleaning up signal to let us tolerate blinks
-    if any(xgaze > 0) && any(ygaze > 0)
-        xgaze(xgaze < 0) = [];
-        ygaze(ygaze < 0) = [];
-        time(xgaze < 0) = []; %Applying same deletion to time vector
+    maybeblink = any(xgaze > 2000) && any(ygaze > 2000);
+    if maybeblink
+        ind_blink = xgaze > 2000 & ygaze > 2000;
+        xgaze(ind_blink) = [];
+        ygaze(ind_blink) = [];
+        time(ind_blink) = []; %Applying same deletion to time vector
     end
     
     %Program cannot collect data as fast as Eyelink provides, so it's

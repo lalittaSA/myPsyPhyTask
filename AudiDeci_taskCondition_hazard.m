@@ -177,7 +177,7 @@ trialVarPreToneBias = zeros(size(trialVarPreToneSeq));
 trialVarPreToneLength = zeros(size(trialVarPreToneSeq));
 trialVarLastConsPretone = zeros(size(trialVarPreToneSeq));
 preToneLengthIndList = 1:length(preToneSeqSelect);
-counter = 1;
+
 for pp = 1:nPrior
     ind = find(trialVarPrior == priorLevels(pp));
     cur_nT = length(ind);
@@ -197,10 +197,10 @@ for pp = 1:nPrior
     seqSnrCond.setPickingMethod('shuffledEach',nRepPerPrior);
     
     keepGoing = true;
-    
+    counter = 1;
     while keepGoing
         seqSnrCond.run();
-        trialVarSNR(counter) = likesSeqAndSnr.name{1};
+        trialVarSNR(ind(counter)) = likesSeqAndSnr.name{1};
         tmpBiasInd = likesSeqAndSnr.name{2};
         tmpLegnthGroupInd = likesSeqAndSnr.name{3};
         cur_sel = intersect(find(preToneGroupSelect == tmpLegnthGroupInd & preToneBiasSelect == tmpBiasInd),preToneLengthIndList);
@@ -210,11 +210,11 @@ for pp = 1:nPrior
 %         end
         tmp_rand = randperm(length(cur_sel));
         cur_sel = cur_sel(tmp_rand(1));
-        trialVarPreToneSeq(counter) = preToneSeqSelect(cur_sel(1));
+        trialVarPreToneSeq(ind(counter)) = preToneSeqSelect(cur_sel(1));
         % more information about pretone conditions
-        trialVarPreToneBias(counter) = preToneBiasSelect(cur_sel(1));
-        trialVarPreToneLength(counter) = preToneLengthSelect(cur_sel(1));
-        trialVarLastConsPretone(counter) = nLastConsPretone(cur_sel(1));
+        trialVarPreToneBias(ind(counter)) = preToneBiasSelect(cur_sel(1));
+        trialVarPreToneLength(ind(counter)) = preToneLengthSelect(cur_sel(1));
+        trialVarLastConsPretone(ind(counter)) = nLastConsPretone(cur_sel(1));
         preToneLengthIndList(preToneLengthIndList == cur_sel(1)) = [];
         keepGoing = ~seqSnrCond.isDone;
         counter = counter + 1;

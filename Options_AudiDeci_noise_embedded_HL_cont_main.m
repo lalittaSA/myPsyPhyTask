@@ -5,8 +5,8 @@ options.freqNames = {'L';'H'};
 
 options.loFreq = 500; %hz      312.5 |  625 | 1250 | 2500 |  5000
 options.hiFreq = 2000; %hz     625   | 1250 | 2500 | 5000 | 10000 
-options.toneDur = 100; %ms 25 | 50
-options.toneIBI = 300; %ms  5 | 10
+options.toneDur = 300; %ms 25 | 50
+options.toneIBI = 100; %ms  5 | 10
 
 options.fs = 44100;%384000;
 
@@ -21,11 +21,11 @@ options.priorLevels = [-2 0 2]; % from {-3 -2 -1 0 1 2 3} | prior setting (arbit
 options.snrLevels = [-0.7 -0.3 -0.1 -0.01 0.01 0.1 0.3 0.7];  % must be symmetric
 % options.snrLevels = [-1 -0.6 -0.3 -0.1 -0.01 0.01 0.1 0.3 0.6 1];
 
-options.snrPrior = [3 2 1; ... % low-freq trials
-                    1 2 3];    % high-freq trials
+options.snrPrior = [5 3 1; ... % low-freq trials
+                    1 3 5];    % high-freq trials
 
-%% number of repetitions (total trials = nRep * sum(snrPrior)) * preToneBlockSize(= nSeqBias (4) * nSeqLength(3-4))
+%% number of repetitions (total trials = nRep * sum(snrPrior)) * preToneBlockSize(= nSeqBias (4) * nSeqLength(4))
 options.nRep = 1;
 
 %% response
-options.responsewindow = 5; %Time allowed to respond in sec
+options.responsewindow = 2; %Time allowed to respond in sec

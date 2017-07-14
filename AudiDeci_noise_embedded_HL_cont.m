@@ -101,7 +101,7 @@ list{'Feedback'}{'end_fx'} = end_player;
 
 %% time variables
 
-iti = 1;
+iti = 2;
 list{'Timing'}{'intertrial'} = iti; %intertrial interval
 list{'Timing'}{'responseWindow'} = options.responsewindow;
 %% Input

@@ -87,7 +87,8 @@ if ~run_calibOnly
         [task_main list_main] = AudiDeci_noise_embedded_HL_PriorPretonev2_train(0,subjAmpRange,subjID,optionName,eyeTrackerOn);
         
     else
-        optionName = 'main';
+%         optionName = 'main';
+        optionName = 'pretoneOnly';
         [task_main list_main] = AudiDeci_noise_embedded_HL_PriorPretonev2(1,subjAmpRange,subjID,optionName,eyeTrackerOn);
         
     end

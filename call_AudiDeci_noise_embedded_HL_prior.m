@@ -27,10 +27,10 @@ eyeTrackerOn = 1;
 if eyeTrackerOn
     Screen('Preference','SkipSyncTests', 0);
     [subjID, EDFfilename] = MKEyelinkCalibrate();
-    [task_calib list_calib] = AudiDeci_noise_embedded_HL_prior_ampCalib(1,subjID(1:end-1));
+    [task_calib list_calib] = AudiDeci_noise_embedded_HL_ampCalib(1,subjID);
 else
     % without eye calib
-    [task_calib list_calib] = AudiDeci_noise_embedded_HL_prior_ampCalib(1);
+    [task_calib list_calib] = AudiDeci_noise_embedded_HL_ampCalib(1);
     subjID = list_calib{'meta'}{'subjID'};
 end
 %% save calib list into table

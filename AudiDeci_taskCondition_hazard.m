@@ -49,6 +49,7 @@ nPreToneDistrib = round(nPreToneDistrib*(preToneBlockSize/sumDistrib));
 
 
 nPreToneDistrib_all = (nPrior * blockSize * nRep) * nPreToneDistrib;
+nPreToneDistrib_perPretoneBias = nPreToneDistrib_all/nPreToneBiasType;
 % group pretone lengths to evenly scatter long pretones in all conditions (as the longer ones are rare)
 preToneLengthList = [];
 preToneLengthType = [];
@@ -131,12 +132,12 @@ for pp = 1:length(nPreTones)
     preToneNegPos = ((preToneSeqNum{pp}-1)*2)-1;        % change from 1 & 2 to -1 & 1
     preToneBias{pp} = sum(preToneNegPos,2)/nPreTones(pp);  % ratio L(neg)-H(pos) preTones | range = [-1,1];
     preToneBiasAll = [preToneBiasAll;preToneBias{pp}];
-    % preTone bias subselection for each length
-    subselect_ind = [ones(nPreToneDistrib_all(pp),1); nComb*ones(nPreToneDistrib_all(pp),1)]; % all L and all H
+    % preTone bias subselection for each length group
+    subselect_ind = [ones(nPreToneDistrib_perPretoneBias(pp),1); nComb*ones(nPreToneDistrib_perPretoneBias(pp),1)]; % all L and all H
     tmp_rand = [];
-    nBalancePreTone = nPreToneDistrib_all(pp);
+    nBalancePreTone = nPreToneDistrib_perPretoneBias(pp);
     noBiasComp = find(preToneBias{pp} == 0);
-    if length(noBiasComp) < nBalancePreTone %excluse all H & all L pretones
+    if length(noBiasComp) < nBalancePreTone %exclude all H & all L pretones
         while length(tmp_rand) < nBalancePreTone
             tmp_rand = [tmp_rand; noBiasComp(randperm(length(noBiasComp)))];
         end
@@ -204,10 +205,6 @@ for pp = 1:nPrior
         tmpBiasInd = likesSeqAndSnr.name{2};
         tmpLegnthGroupInd = likesSeqAndSnr.name{3};
         cur_sel = intersect(find(preToneGroupSelect == tmpLegnthGroupInd & preToneBiasSelect == tmpBiasInd),preToneLengthIndList);
-%         while isempty(cur_sel)
-%             tmpLegnthGroupInd = tmpLegnthGroupInd-1;
-%             cur_sel = intersect(find(preToneGroupSelect == tmpLegnthGroupInd & preToneBiasSelect == tmpBiasInd),preToneLengthIndList);
-%         end
         tmp_rand = randperm(length(cur_sel));
         cur_sel = cur_sel(tmp_rand(1));
         trialVarPreToneSeq(ind(counter)) = preToneSeqSelect(cur_sel(1));

@@ -1,4 +1,4 @@
-function list = AudiDeci_taskCondition_hazard(list,options)
+function list = AudiDeci_taskCondition_hazard2(list,options)
 
 %% get frequency settings
 freqTypes = options.freqTypes;
@@ -65,42 +65,6 @@ preToneLengthGroups = mid_bins(preToneLengthNum);
 preToneGroupLabel = unique([preToneLengthNum,preToneLengthGroups,preToneLengthList],'rows');
 
 
-%% generate blocks of prior - random order
-
-nBlock = nPrior * nRep * preToneBlockSize;
-nTrials = nPrior * blockSize * nRep * preToneBlockSize;
-pick_method = 'shuffledEach';
-priorConditions = topsConditions();
-priorParameter = 'priorLevel';
-priorConditions.addParameter(priorParameter, num2cell(priorLevels));
-likesPrior = topsFoundation();
-priorConditions.addAssignment('priorLevel', likesPrior, '.', 'name');
-
-switch pick_method
-    case 'shuffledEach'
-        priorConditions.setPickingMethod('shuffledEach',nRep * preToneBlockSize);
-        priorConditions.run();
-        trialVarPrior = nan(nBlock,1);
-        for ii = 1:nBlock
-            trialVarPrior(ii) = priorLevels(priorConditions.pickSequence(ii));
-        end
-    case 'coin-toss'
-        priorConditions.setPickingMethod('coin-toss');
-        priorConditions.maxPicks = nBlock;
-        trialVarPrior = nan(nBlock,1);
-        keepGoing = true;
-        counter = 1;
-        while keepGoing || any(isnan(trialVarPrior))
-            priorConditions.run();
-            trialVarPrior(counter) = likesPrior.name;
-            keepGoing = ~priorConditions.isDone;
-            counter = counter + 1;
-        end
-end
-
-trialVarPrior = repmat(trialVarPrior,1,blockSize);
-trialVarPrior = reshape(trialVarPrior',[],1);
-
 %% get pretone settings & generate pretone combinations
 preToneCombination = options.preToneCombination;
 
@@ -132,10 +96,10 @@ for pp = 1:length(nPreTones)
     preToneNegPos = ((preToneSeqNum{pp}-1)*2)-1;        % change from 1 & 2 to -1 & 1
     preToneBias{pp} = sum(preToneNegPos,2)/nPreTones(pp);  % ratio L(neg)-H(pos) preTones | range = [-1,1];
     preToneBiasAll = [preToneBiasAll;preToneBias{pp}];
-    % preTone bias subselection for each length group
-    subselect_ind = [ones(nPreToneDistrib_perPretoneBias(pp),1); nComb*ones(nPreToneDistrib_perPretoneBias(pp),1)]; % all L and all H
+    % preTone bias subselection for each length (we have 3x more trials than needed here)
+    subselect_ind = [ones(nPreToneDistrib_all(pp),1); nComb*ones(nPreToneDistrib_all(pp),1)]; % all L and all H
     tmp_rand = [];
-    nBalancePreTone = nPreToneDistrib_perPretoneBias(pp);
+    nBalancePreTone = nPreToneDistrib_all(pp);
     noBiasComp = find(preToneBias{pp} == 0);
     if length(noBiasComp) < nBalancePreTone %exclude all H & all L pretones
         while length(tmp_rand) < nBalancePreTone
@@ -171,50 +135,87 @@ end
 % preToneBiasBins = histcounts(preToneBiasSelect,preToneBiasEdges);
 preToneLengthType = unique(preToneGroupSelect);
 
+%% generate blocks of prior - random order
+
+nBlock = nPrior * nRep * nPreToneBiasType;
+nTrials = nPrior * blockSize * nRep * preToneBlockSize;
+pick_method = 'shuffledEach';
+priorPretoneConditions = topsConditions();
+priorPretoneConditions.addParameter('priorLevel', num2cell(priorLevels));
+priorPretoneConditions.addParameter('preToneBias', num2cell(preToneBiasGroup));
+likesPriorPretone = topsFoundation();
+priorPretoneConditions.addAssignment('priorLevel', likesPriorPretone, '.', 'name','{}',{1});
+priorPretoneConditions.addAssignment('preToneBias', likesPriorPretone, '.', 'name','{}',{2});
+
+switch pick_method
+    case 'shuffledEach'
+        priorPretoneConditions.setPickingMethod('shuffledEach',nRep);
+        priorPretoneConditions.run();
+        priorSeq = nan(nBlock,1);
+        pretoneSeq = nan(nBlock,1);
+        for counter = 1:nBlock
+            priorPretoneConditions.run();
+            priorSeq(counter) = likesPriorPretone.name{1};
+            pretoneSeq(counter) = likesPriorPretone.name{2};
+        end
+    case 'coin-toss'
+        priorPretoneConditions.setPickingMethod('coin-toss');
+        priorPretoneConditions.maxPicks = nBlock;
+        priorSeq = nan(nBlock,1);
+        pretoneSeq = nan(nBlock,1);
+        keepGoing = true;
+        counter = 1;
+        while keepGoing
+            priorPretoneConditions.run();
+            priorSeq(counter) = likesPriorPretone.name{1};
+            pretoneSeq(counter) = likesPriorPretone.name{2};
+            keepGoing = ~priorPretoneConditions.isDone;
+            counter = counter + 1;
+        end
+end
+
+trialVarPrior = repmat(priorSeq,1,blockSize*nPreToneGroup);
+trialVarPrior = reshape(trialVarPrior',[],1);
+
+trialVarPreToneBias = repmat(pretoneSeq,1,blockSize*nPreToneGroup);
+trialVarPreToneBias = reshape(trialVarPreToneBias',[],1);
+
 %% generate snrLevels & preToneSequence for each priorLevel
 trialVarSNR = zeros(size(trialVarPrior));
 trialVarPreToneSeq = cell(size(trialVarPrior));
-trialVarPreToneBias = zeros(size(trialVarPreToneSeq));
 trialVarPreToneLength = zeros(size(trialVarPreToneSeq));
 trialVarLastConsPretone = zeros(size(trialVarPreToneSeq));
 preToneLengthIndList = 1:length(preToneSeqSelect);
 
-for pp = 1:nPrior
-    ind = find(trialVarPrior == priorLevels(pp));
+for bb = 1:nBlock
+    ind = find(trialVarPrior == priorSeq(bb) & trialVarPreToneBias == pretoneSeq(bb));
+    pp = find(priorLevels == priorSeq(bb));
     cur_nT = length(ind);
-    min_nT = length(snrValues{pp})*nPreToneGroup*nPreToneBiasType;
+    min_nT = length(snrValues{pp})*nPreToneGroup;
     nRepPerPrior = cur_nT/min_nT;
     
     % generate cohLevels
     seqSnrCond = topsConditions();
     seqSnrCond.addParameter('snrLevel', num2cell(snrValues{pp}));
-    seqSnrCond.addParameter('preToneBias', num2cell(preToneBiasGroup));
     seqSnrCond.addParameter('preToneLength', num2cell(preToneLengthType));
     
     likesSeqAndSnr = topsFoundation();
     seqSnrCond.addAssignment('snrLevel',likesSeqAndSnr, '.', 'name','{}',{1});
-    seqSnrCond.addAssignment('preToneBias',likesSeqAndSnr, '.', 'name','{}',{2});
-    seqSnrCond.addAssignment('preToneLength',likesSeqAndSnr, '.', 'name','{}',{3});
+    seqSnrCond.addAssignment('preToneLength',likesSeqAndSnr, '.', 'name','{}',{2});
     seqSnrCond.setPickingMethod('shuffledEach',nRepPerPrior);
     
-    keepGoing = true;
-    counter = 1;
-    while keepGoing
+    for counter = 1:cur_nT
         seqSnrCond.run();
         trialVarSNR(ind(counter)) = likesSeqAndSnr.name{1};
-        tmpBiasInd = likesSeqAndSnr.name{2};
-        tmpLegnthGroupInd = likesSeqAndSnr.name{3};
-        cur_sel = intersect(find(preToneGroupSelect == tmpLegnthGroupInd & preToneBiasSelect == tmpBiasInd),preToneLengthIndList);
+        tmpLegnthGroupInd = likesSeqAndSnr.name{2};
+        cur_sel = intersect(find(preToneGroupSelect == tmpLegnthGroupInd & preToneBiasSelect == trialVarPreToneBias(ind(counter))),preToneLengthIndList);
         tmp_rand = randperm(length(cur_sel));
         cur_sel = cur_sel(tmp_rand(1));
         trialVarPreToneSeq(ind(counter)) = preToneSeqSelect(cur_sel(1));
         % more information about pretone conditions
-        trialVarPreToneBias(ind(counter)) = preToneBiasSelect(cur_sel(1));
         trialVarPreToneLength(ind(counter)) = preToneLengthSelect(cur_sel(1));
         trialVarLastConsPretone(ind(counter)) = nLastConsPretone(cur_sel(1));
         preToneLengthIndList(preToneLengthIndList == cur_sel(1)) = [];
-        keepGoing = ~seqSnrCond.isDone;
-        counter = counter + 1;
     end
 end
 
